@@ -12,7 +12,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://unpkg.com; script-src 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
 <title>Monitor de baterías</title>
 <style>
-  :root { --fondo:#0b1c30; --tarjeta:rgba(12,27,46,.88); --tarjeta2:rgba(255,255,255,.07); --borde:rgba(255,255,255,.14); --texto:#f3f7fb; --suave:#b3c1d0; --verde:#43d17f; --verde-f:rgba(67,209,127,.16); --rojo:#ff6b6b; --rojo-f:rgba(255,107,107,.17); --naranja:#f7b23b; --naranja-f:rgba(247,178,59,.17); --azul:#62bcff; }
+  :root { --fondo:#0b1c30; --tarjeta:rgba(12,27,46,.94); --tarjeta2:rgba(255,255,255,.07); --borde:rgba(255,255,255,.14); --texto:#f3f7fb; --suave:#b3c1d0; --verde:#43d17f; --verde-f:rgba(67,209,127,.16); --rojo:#ff6b6b; --rojo-f:rgba(255,107,107,.17); --naranja:#f7b23b; --naranja-f:rgba(247,178,59,.17); --azul:#62bcff; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   [hidden] { display:none !important; }
   html { color-scheme:dark; }
@@ -33,7 +33,7 @@
   .no { color:var(--rojo); background:var(--rojo-f); }
   .ojo { color:var(--naranja); background:var(--naranja-f); }
   .marca-demo { display:inline-block; padding:3px 9px; border-radius:7px; background:var(--naranja); color:#20160a; font-size:13px; font-weight:800; letter-spacing:.05em; }
-  .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:16px; padding:18px; min-width:0; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:16px; padding:18px; min-width:0; }
   .rejilla-inicio { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); }
   .polis { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); margin-top:14px; }
   .buscador { margin-bottom:14px; padding:14px 18px; }
@@ -220,7 +220,7 @@
 <script>
   // Solo lectura: esta página no escribe nada en la base de datos
   const BASE = 'https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app/v/';
-  const CONECTADO_MS = 35000, CADA_MS = 2000, CADA_DEMO_MS = 3000;   // las placas suben datos cada 20 s
+  const CONECTADO_MS = 35000, CADA_MS = 2000, CADA_DEMO_MS = 1000, REPASO_VUELTAS = 5;   // las placas suben datos cada 20 s
   const CLAVE = location.hash.slice(1);   // la clave va tras el # y nunca llega al servidor de la página
   const $ = id => document.getElementById(id);
   let ultimo = null, vista = 'inicio', actual = null;
@@ -317,18 +317,24 @@
     return { coche: limpiarNodo(e.coche), furgoneta: limpiarNodo(e.furgoneta) };
   }
 
-  let leyendo = false;
+  let leyendo = false, enVivo = false, crudo = null;
+  function recibido() {
+    ultimo = limpiar(crudo);
+    // Firebase responde vacío, sin error, si el enlace está mal copiado
+    $('red').textContent = crudo ? 'En línea' : 'Enlace sin datos';
+    $('red').className = 'pastilla ' + (crudo ? 'si' : 'ojo');
+    pintar();
+  }
   async function leer() {
     if (leyendo) return;   // con mala cobertura, una lectura puede tardar más que el intervalo
     leyendo = true;
     try {
       const r = await fetch(BASE + encodeURIComponent(CLAVE) + '/estado.json', { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
-      const datos = await r.json();
-      ultimo = limpiar(datos);
-      // Firebase responde vacío, sin error, si el enlace está mal copiado
-      $('red').textContent = datos ? 'En línea' : 'Enlace sin datos';
-      $('red').className = 'pastilla ' + (datos ? 'si' : 'ojo');
+      crudo = await r.json();
+      leyendo = false;
+      recibido();
+      return;
     } catch (err) {
       $('red').textContent = 'Sin conexión';
       $('red').className = 'pastilla no';
@@ -336,6 +342,31 @@
     leyendo = false;
     // También sin internet: lo que deja de actualizarse tiene que pasar a rojo
     pintar();
+  }
+
+  // Firebase avisa en cuanto una placa sube datos, sin esperar a la siguiente lectura
+  function ponerEn(raiz, ruta, valor) {
+    const partes = ruta.split('/').filter(Boolean);
+    if (!partes.length) return valor;
+    if (partes.includes('__proto__')) return raiz;
+    const base = raiz && typeof raiz === 'object' ? raiz : {};
+    let n = base;
+    partes.slice(0, -1).forEach(p => { if (!n[p] || typeof n[p] !== 'object') n[p] = {}; n = n[p]; });
+    if (valor === null) delete n[partes[partes.length - 1]];
+    else n[partes[partes.length - 1]] = valor;
+    return base;
+  }
+  function escuchar() {
+    const canal = new EventSource(BASE + encodeURIComponent(CLAVE) + '/estado.json');
+    canal.onopen = () => { enVivo = true; };
+    canal.onerror = () => { enVivo = false; };   // el navegador reintenta solo; mientras, se sigue leyendo cada 2 s
+    const aviso = (ev, aplicar) => {
+      try { aplicar(JSON.parse(ev.data)); recibido(); } catch (err) { leer(); }
+    };
+    canal.addEventListener('put', ev => aviso(ev, j => { crudo = ponerEn(crudo, j.path, j.data); }));
+    canal.addEventListener('patch', ev => aviso(ev, j => { Object.keys(j.data).forEach(k => { crudo = ponerEn(crudo, j.path + '/' + k, j.data[k]); }); }));
+    canal.addEventListener('cancel', () => { enVivo = false; canal.close(); });
+    return canal;
   }
 
   // --- Mapa: se carga solo al necesitarlo; si falla, el resto de la aplicación sigue funcionando ---
@@ -442,13 +473,13 @@
 
   function actualizarBateria(b) {
     const parada = b.v.length && evaluar(b).nivel === 2;
-    b.corriente = parada ? 0 : Math.max(-60, Math.min(60, b.corriente + azar(-4, 4)));
-    b.soc = Math.max(15, Math.min(98, b.soc + b.corriente * 0.002));
+    b.corriente = parada ? 0 : Math.max(-60, Math.min(60, b.corriente + azar(-2.5, 2.5)));
+    b.soc = Math.max(15, Math.min(98, b.soc + b.corriente * 0.0007));
     const base = 3.2 + 0.0012 * b.soc + b.corriente * 0.0002;
     b.v = b.margen.map(m => base + m + azar(-0.001, 0.001));
     if (b.fallo) {
       const f = b.fallo;
-      f.actual += Math.max(-0.012, Math.min(0.012, f.objetivo - f.actual));
+      f.actual += Math.max(-0.004, Math.min(0.004, f.objetivo - f.actual));
       b.v[f.celda] = f.actual;
     }
     b.t = b.sondasBase.map(m => 24 + Math.abs(b.corriente) * 0.1 + m + b.calor + azar(-0.15, 0.15));
@@ -780,7 +811,12 @@
     $('red').hidden = true;
   } else {
     leer();
-    setInterval(leer, CADA_MS);
+    escuchar();
+    // Con el aviso en directo solo se repasa de vez en cuando; si se corta, se lee cada 2 s
+    let vueltas = 0;
+    setInterval(() => { if (!enVivo || ++vueltas % REPASO_VUELTAS === 0) leer(); }, CADA_MS);
+    setInterval(pintar, 1000);   // "hace X s" y el paso a NO CONECTADO no dependen de que lleguen datos
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) leer(); });
   }
 </script>
 </body>
