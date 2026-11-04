@@ -91,7 +91,32 @@
   .baldosa.apagada { border-left-color:var(--rojo); }
   .baldosa.n0 em { color:var(--verde); } .baldosa.n1 em { color:var(--naranja); } .baldosa.n2 em, .baldosa.apagada em { color:var(--rojo); }
   .celdas { display:grid; grid-template-columns:repeat(auto-fill,minmax(68px,1fr)); gap:6px; margin-top:10px; }
-  .celda { padding:6px 7px; border-radius:8px; background:var(--tarjeta2); font-variant-numeric:tabular-nums; }
+  .segmento { display:inline-flex; gap:3px; padding:3px; border-radius:11px; background:var(--tarjeta2); }
+  .segmento button { min-height:38px; padding:6px 12px; border:0; border-radius:8px; background:none; color:var(--suave); font:inherit; font-size:14px; font-weight:650; cursor:pointer; }
+  .segmento button[aria-pressed="true"] { background:var(--texto); color:#0b1c30; }
+  .segmento button:focus-visible, .celda:focus-visible, #graf-svg:focus-visible { outline:2px solid var(--azul); outline-offset:2px; }
+  .leyenda { display:flex; flex-wrap:wrap; gap:6px 16px; color:var(--suave); font-size:13px; margin-bottom:8px; }
+  .leyenda span { display:inline-flex; align-items:center; gap:6px; }
+  .leyenda i { display:inline-block; width:16px; height:2px; background:#3d97e6; border-radius:2px; }
+  .leyenda i.banda { height:10px; background:rgba(179,193,208,.28); }
+  .grafica { position:relative; }
+  #graf-svg { display:block; width:100%; height:260px; touch-action:pan-y; border-radius:6px; }
+  #graf-svg text { fill:var(--suave); font-size:12px; font-variant-numeric:tabular-nums; }
+  #graf-svg text.fin { fill:var(--texto); font-weight:650; }
+  .graf-tip { position:absolute; top:6px; min-width:150px; padding:8px 10px; border:1px solid var(--borde); border-radius:9px; background:#0a1727; font-size:13px; pointer-events:none; font-variant-numeric:tabular-nums; }
+  .graf-tip div { display:flex; align-items:center; gap:7px; }
+  .graf-tip small { color:var(--suave); font-size:12.5px; }
+  .graf-tip i { flex:none; width:12px; height:2px; background:#3d97e6; }
+  .graf-tip i.banda { background:#b3c1d0; }
+  .pista { margin:12px 0 0; color:var(--suave); font-size:13px; }
+  .tabla-graf { margin-top:14px; }
+  .tabla-graf > summary { font-size:14px; font-weight:650; color:var(--suave); }
+  .tabla-graf .marco-tabla { max-height:260px; overflow:auto; margin-top:8px; }
+  .tabla-graf table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+  .tabla-graf th, .tabla-graf td { padding:5px 8px; border-bottom:1px solid var(--borde); text-align:right; white-space:nowrap; }
+  .tabla-graf th:first-child, .tabla-graf td:first-child { text-align:left; }
+  .celda { display:block; width:100%; padding:6px 7px; border:0; border-radius:8px; background:var(--tarjeta2); color:inherit; font:inherit; text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; }
+  .celda.elegida { box-shadow:inset 0 0 0 2px #3d97e6; }
   .celda small { display:block; color:var(--suave); font-size:11.5px; }
   .celda span { font-weight:650; font-size:14px; }
   .celda.n1 { background:var(--naranja-f); } .celda.n1 span { color:var(--naranja); }
@@ -156,6 +181,7 @@
       <details class="tarjeta" open><summary>Ajustes</summary><div class="filas" id="bat-ajustes"></div></details>
       <details class="tarjeta" open><summary>Datos del BMS <span class="pastilla no" style="margin-left:auto">NO CONECTADO</span></summary><div id="bat-bms"></div></details>
     </div>
+    <section class="tarjeta" style="margin-top:14px"><h2>Tensión por celda</h2><p class="pista">Sin datos: el BMS no está conectado.</p></section>
   </main>
 
   <main id="v-mapa" hidden>
@@ -180,7 +206,14 @@
         <details class="tarjeta" open><summary>Ajustes</summary><div class="filas" id="pack-ajustes"></div></details>
         <details class="tarjeta" open><summary>Datos del BMS</summary><div id="pack-bms"></div></details>
       </div>
-      <section class="tarjeta"><h2>Tensión por celda</h2><div class="celdas" id="pack-celdas"></div></section>
+      <section class="tarjeta" aria-labelledby="t-graf">
+        <div class="titulo-pagina" style="margin-bottom:10px"><h2 id="t-graf">Tensión por celda</h2><div class="segmento" role="group" aria-label="Periodo de la gráfica" id="graf-rangos"></div></div>
+        <div class="leyenda" id="graf-leyenda"></div>
+        <div class="grafica"><svg id="graf-svg" role="img" tabindex="0"></svg><div id="graf-tip" class="graf-tip" hidden></div></div>
+        <p class="pista">Pulsa una celda para ver su línea en la gráfica.</p>
+        <div class="celdas" id="pack-celdas"></div>
+        <details class="tabla-graf" id="graf-detalles"><summary>Ver los datos en tabla</summary><div class="marco-tabla" id="graf-tabla"></div></details>
+      </section>
     </div>
   </main>
 </div>
@@ -496,7 +529,110 @@
       deseq: Math.round((r.vMax - r.vMin) * 1000) + ' mV', tMax: decimal(r.tMax, 1) + ' ºC', alarmas: e.lista.length,
     };
     $('pack-bms').innerHTML = filasBms(k => valores[k]);
-    $('pack-celdas').innerHTML = b.v.map((v, i) => '<div class="celda n' + (v < CRITICO_V ? 2 : v < AVISO_V ? 1 : 0) + '"><small>Celda ' + (i + 1) + '</small><span>' + decimal(v, 3) + '</span></div>').join('');
+    // Las celdas se crean una vez por batería para no perder el foco al actualizar sus valores
+    const caja = $('pack-celdas');
+    if (caja.dataset.pack !== b.id) {
+      caja.dataset.pack = b.id;
+      celdaGraf = r.cMin - 1;
+      indiceGraf = null;
+      caja.innerHTML = b.v.map((v, i) => '<button class="celda" type="button" data-celda="' + i + '"><small>Celda ' + (i + 1) + '</small><span></span></button>').join('');
+    }
+    caja.querySelectorAll('.celda').forEach((el, i) => {
+      el.className = 'celda n' + (b.v[i] < CRITICO_V ? 2 : b.v[i] < AVISO_V ? 1 : 0) + (i === celdaGraf ? ' elegida' : '');
+      el.setAttribute('aria-pressed', i === celdaGraf);
+      el.querySelector('span').textContent = decimal(b.v[i], 3);
+    });
+    pintarGrafica(b);
+  }
+
+  // --- Gráfica: el histórico de la DEMO se calcula a partir de cada batería y termina en su valor actual ---
+  const RANGOS = {
+    minutos: { nombre: 'Minutos', titulo: 'Última hora', n: 60, paso: 6e4, amp: 0.006, caida: 0.5, ciclos: 2 },
+    horas: { nombre: 'Horas', titulo: 'Últimas 24 horas', n: 48, paso: 18e5, amp: 0.03, caida: 0.2, ciclos: 2 },
+    dias: { nombre: 'Días', titulo: 'Últimos 30 días', n: 60, paso: 432e5, amp: 0.045, caida: 0.06, ciclos: 8 },
+    anios: { nombre: 'Años', titulo: 'Últimos 5 años', n: 60, paso: 26298e5, amp: 0.03, caida: 0.02, ciclos: 5 },
+  };
+  let rangoGraf = 'horas', celdaGraf = 0, indiceGraf = null, puntosGraf = [], escalaGraf = null;
+  const ruido = (a, b, c) => { const x = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return x - Math.floor(x) - 0.5; };
+  const semilla = id => [...id].reduce((s, c) => s + c.charCodeAt(0), 0);
+
+  function historial(b) {
+    const R = RANGOS[rangoGraf], s = semilla(b.id) + Object.keys(RANGOS).indexOf(rangoGraf) * 13, ahora = Date.now();
+    const sanas = b.v.filter((v, j) => !b.fallo || j !== b.fallo.celda);
+    const media = sanas.reduce((a, v) => a + v, 0) / sanas.length;
+    const puntos = [];
+    for (let i = 0; i <= R.n; i++) {
+      const edad = (R.n - i) / R.n, atenuar = Math.min(1, edad * 6);
+      const ciclo = Math.sin(i / R.n * R.ciclos * 2 * Math.PI + s) * R.amp * atenuar;
+      const v = b.v.map((actual, j) => {
+        const cambio = ciclo + b.margen[j] * (rangoGraf === 'anios' ? -0.6 * edad : 0) + ruido(s, i, j) * 0.003 * atenuar;
+        if (!b.fallo || j !== b.fallo.celda) return actual + cambio;
+        // La celda que falla estaba sana hasta hace poco y baja hasta su valor de ahora
+        const t = Math.min(1, Math.max(0, 1 - (edad - R.caida / 2) / (R.caida / 2)));
+        return media + b.margen[j] + cambio + (actual - media - b.margen[j]) * t * t * (3 - 2 * t);
+      });
+      puntos.push({ hora: ahora - (R.n - i) * R.paso, celda: v[celdaGraf], max: Math.max(...v), min: Math.min(...v) });
+    }
+    return puntos;
+  }
+
+  function fechaGraf(ms, larga) {
+    const d = new Date(ms);
+    const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (rangoGraf === 'minutos' || rangoGraf === 'horas') return larga ? d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ', ' + hora : hora;
+    if (rangoGraf === 'dias') return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+  }
+
+  function pintarGrafica(b) {
+    const svg = $('graf-svg'), R = RANGOS[rangoGraf], ancho = svg.clientWidth || 320, alto = svg.clientHeight || 260;
+    const izq = 40, der = 58, arr = 10, aba = 24;
+    const puntos = puntosGraf = historial(b);
+    let bajo = Math.min(...puntos.map(p => p.min)), alto_v = Math.max(...puntos.map(p => p.max));
+    const lineas = [[AVISO_V, 'Aviso', '#f7b23b'], [CRITICO_V, 'Crítica', '#ff6b6b']].filter(l => bajo < l[0] + 0.1);
+    lineas.forEach(l => { bajo = Math.min(bajo, l[0]); });
+    const paso = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5].find(p => (alto_v - bajo) / p <= 4) || 1;
+    const y0 = Math.floor(bajo / paso) * paso, y1 = Math.ceil(alto_v / paso) * paso;
+    const x = i => izq + i / R.n * (ancho - izq - der), y = v => arr + (y1 - v) / (y1 - y0) * (alto - arr - aba);
+    const camino = (lista, f) => lista.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(f(p)).toFixed(1)).join('');
+    const banda = camino(puntos, p => p.max) + puntos.map((p, i) => 'L' + x(R.n - i).toFixed(1) + ' ' + y(puntos[R.n - i].min).toFixed(1)).join('') + 'Z';
+    let dibujo = '';
+    for (let v = y0; v <= y1 + paso / 2; v += paso) dibujo += '<line x1="' + izq + '" x2="' + (ancho - der) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="rgba(255,255,255,.1)"/><text x="' + (izq - 7) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + decimal(v, 2) + '</text>';
+    [0, 1 / 3, 2 / 3, 1].forEach(f => {
+      const i = Math.round(f * R.n);
+      dibujo += '<text x="' + x(i) + '" y="' + (alto - 6) + '" text-anchor="' + (f === 0 ? 'start' : f === 1 ? 'end' : 'middle') + '">' + fechaGraf(puntos[i].hora) + '</text>';
+    });
+    lineas.forEach(l => { dibujo += '<line x1="' + izq + '" x2="' + (ancho - der) + '" y1="' + y(l[0]) + '" y2="' + y(l[0]) + '" stroke="' + l[2] + '"/><text x="' + (ancho - der + 6) + '" y="' + (y(l[0]) + 4) + '">' + l[1] + '</text>'; });
+    const ultimo = puntos[R.n];
+    // La etiqueta del valor actual se aparta si pisaría el borde superior o la de un umbral
+    const yFin = y(ultimo.celda) - 7, yEtiqueta = yFin < arr + 8 || lineas.some(l => Math.abs(y(l[0]) + 4 - yFin) < 14) ? y(ultimo.celda) + 16 : yFin;
+    dibujo += '<path d="' + banda + '" fill="rgba(179,193,208,.28)"/><path d="' + camino(puntos, p => p.celda) + '" fill="none" stroke="#3d97e6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + x(R.n) + '" cy="' + y(ultimo.celda) + '" r="4" fill="#3d97e6" stroke="#0f2035" stroke-width="2"/><text class="fin" x="' + (x(R.n) + 7) + '" y="' + yEtiqueta + '">' + decimal(ultimo.celda, 2) + ' V</text><g id="graf-cruz"></g>';
+    svg.setAttribute('viewBox', '0 0 ' + ancho + ' ' + alto);
+    svg.setAttribute('aria-label', 'Tensión de la celda ' + (celdaGraf + 1) + ', ' + R.titulo.toLowerCase() + '. Valor actual ' + decimal(ultimo.celda, 2) + ' voltios. Usa las flechas para recorrer los datos.');
+    svg.innerHTML = dibujo;
+    escalaGraf = { x, y, izq, ancho, der, arr, alto, aba };
+    $('graf-rangos').innerHTML = Object.keys(RANGOS).map(k => '<button type="button" data-rango="' + k + '" aria-pressed="' + (k === rangoGraf) + '">' + RANGOS[k].nombre + '</button>').join('');
+    $('graf-leyenda').innerHTML = '<span>' + R.titulo + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>';
+    if ($('graf-detalles').open) pintarTabla();
+    pintarCruz();
+  }
+
+  function pintarCruz() {
+    const cruz = $('graf-cruz'), tip = $('graf-tip'), p = puntosGraf[indiceGraf];
+    if (!cruz) return;
+    if (indiceGraf === null || !p) { cruz.innerHTML = ''; tip.hidden = true; return; }
+    const e = escalaGraf, cx = e.x(indiceGraf);
+    cruz.innerHTML = '<line x1="' + cx + '" x2="' + cx + '" y1="' + e.arr + '" y2="' + (e.alto - e.aba) + '" stroke="rgba(255,255,255,.45)"/><circle cx="' + cx + '" cy="' + e.y(p.celda) + '" r="4" fill="#3d97e6" stroke="#0f2035" stroke-width="2"/>';
+    tip.innerHTML = '<small>' + fechaGraf(p.hora, true) + '</small><div><i></i><b>' + decimal(p.celda, 3) + ' V</b><small>Celda ' + (celdaGraf + 1) + '</small></div><div><i class="banda"></i><b>' + decimal(p.max, 3) + ' V</b><small>Más alta</small></div><div><i class="banda"></i><b>' + decimal(p.min, 3) + ' V</b><small>Más baja</small></div>';
+    tip.hidden = false;
+    const hueco = tip.offsetWidth + 12;
+    tip.style.left = (cx + hueco > e.ancho ? Math.max(0, cx - hueco) : cx + 12) + 'px';
+  }
+
+  function pintarTabla() {
+    $('graf-tabla').innerHTML = '<table><thead><tr><th scope="col">Fecha</th><th scope="col">Celda ' + (celdaGraf + 1) + '</th><th scope="col">Más alta</th><th scope="col">Más baja</th></tr></thead><tbody>' +
+      puntosGraf.slice().reverse().map(p => '<tr><td>' + fechaGraf(p.hora, true) + '</td><td>' + decimal(p.celda, 3) + ' V</td><td>' + decimal(p.max, 3) + ' V</td><td>' + decimal(p.min, 3) + ' V</td></tr>').join('') + '</tbody></table>';
   }
 
   let mapaParque = null, encuadrarParque = null;
@@ -553,10 +689,36 @@
   }
   window.addEventListener('popstate', ev => { const s = ev.state || { v: 'inicio' }; mostrar(s.v, s.id, s.dest); });
 
+  const grafSvg = $('graf-svg');
+  grafSvg.addEventListener('pointermove', ev => {
+    if (!escalaGraf) return;
+    const caja = grafSvg.getBoundingClientRect(), e = escalaGraf, n = puntosGraf.length - 1;
+    indiceGraf = Math.max(0, Math.min(n, Math.round((ev.clientX - caja.left - e.izq) / (e.ancho - e.izq - e.der) * n)));
+    pintarCruz();
+  });
+  grafSvg.addEventListener('pointerleave', () => { indiceGraf = null; pintarCruz(); });
+  grafSvg.addEventListener('blur', () => { indiceGraf = null; pintarCruz(); });
+  grafSvg.addEventListener('keydown', ev => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    ev.preventDefault();
+    const n = puntosGraf.length - 1, base = indiceGraf === null ? n : indiceGraf;
+    indiceGraf = Math.max(0, Math.min(n, base + (ev.key === 'ArrowLeft' ? -1 : 1)));
+    pintarCruz();
+  });
+  $('graf-detalles').addEventListener('toggle', () => { if ($('graf-detalles').open) pintarTabla(); });
+  window.addEventListener('resize', () => { if (vista === 'pack') pintarGrafica(demoPorId(actual)); });
+
   document.addEventListener('click', ev => {
-    const el = ev.target.closest('[data-volver],[data-bateria],[data-pack]');
+    const el = ev.target.closest('[data-volver],[data-bateria],[data-pack],[data-rango],[data-celda]');
     if (!el) return;
-    if ('volver' in el.dataset) history.back();
+    if (el.dataset.rango) {
+      const foco = el.dataset.rango;
+      rangoGraf = foco; indiceGraf = null;
+      pintarPack();
+      document.querySelector('[data-rango="' + foco + '"]').focus();
+    }
+    else if (el.dataset.celda) { celdaGraf = Number(el.dataset.celda); indiceGraf = null; pintarPack(); }
+    else if ('volver' in el.dataset) history.back();
     else if (el.dataset.bateria) ir('bateria', Number(el.dataset.bateria));
     else if (el.dataset.pack) ir('pack', el.dataset.pack);
   });
