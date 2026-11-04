@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0d1117">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
+<title>Lectura LoRa</title>
+<style>
+  :root { --fondo:#0d1117; --tarjeta:#161b22; --tarjeta2:#1f2630; --borde:#2b333d; --texto:#f0f3f6; --suave:#9aa6b2; --verde:#3fb950; --verde-f:#143d22; --rojo:#f85149; --rojo-f:#4a1c1b; --naranja:#f0a13a; --naranja-f:#46311a; --azul:#58a6ff; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) { --fondo:#f4f6f8; --tarjeta:#ffffff; --tarjeta2:#eef1f4; --borde:#d9dee4; --texto:#1b222a; --suave:#5d6875; --verde:#1a7f37; --verde-f:#dcf5e3; --rojo:#c9302a; --rojo-f:#fde5e4; --naranja:#a8620a; --naranja-f:#fbedd8; --azul:#0969da; }
+  }
+  * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--fondo); color:var(--texto); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:16px 16px 32px; display:grid; gap:12px; grid-template-columns:minmax(0,1fr); }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 2px 6px; }
+  h1 { margin:0; font-size:21px; font-weight:700; letter-spacing:-.01em; }
+  h2 { margin:0; font-size:17px; font-weight:650; }
+  .pastilla { display:inline-flex; align-items:center; gap:7px; padding:4px 11px; border-radius:99px; font-size:13px; font-weight:650; white-space:nowrap; }
+  .pastilla::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .si { color:var(--verde); background:var(--verde-f); }
+  .no { color:var(--rojo); background:var(--rojo-f); }
+  .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:14px; padding:16px; min-width:0; }
+  .cabecera { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+  .aviso { color:var(--naranja); background:var(--naranja-f); border-radius:10px; padding:10px 12px; font-size:14px; }
+  .fila { display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:42px; padding:7px 0; border-top:1px solid var(--borde); }
+  .fila b { color:var(--suave); font-weight:550; font-size:14px; flex:none; }
+  .fila span { text-align:right; overflow-wrap:anywhere; font-weight:550; font-size:15px; }
+  .fila a { color:var(--azul); }
+  .c-verde { color:var(--verde); } .c-naranja { color:var(--naranja); } .c-rojo { color:var(--rojo); } .c-suave { color:var(--suave); }
+  .rayas { display:inline-flex; align-items:flex-end; gap:3px; height:18px; vertical-align:-3px; margin-left:8px; }
+  .rayas i { width:5px; background:var(--borde); border-radius:1px; }
+  .rayas i.on { background:var(--verde); }
+  .rayas i:nth-child(1){height:5px}.rayas i:nth-child(2){height:9px}.rayas i:nth-child(3){height:13px}.rayas i:nth-child(4){height:18px}
+  @media (min-width:640px) { main { grid-template-columns:repeat(2,minmax(0,1fr)); } .ancho { grid-column:1 / -1; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="ancho"><h1>Lectura LoRa</h1><span id="red" class="pastilla no">Cargando</span></header>
+  <div id="aviso" class="aviso ancho" hidden></div>
+  <section class="tarjeta" id="nodo1"></section>
+  <section class="tarjeta" id="nodo2"></section>
+  <section class="tarjeta ancho" id="auxiliar" hidden></section>
+</main>
+<script>
+  // Solo lectura: esta página no escribe nada en la base de datos
+  const BASE = 'https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app/v/';
+  const CONECTADO_MS = 45000, CADA_MS = 5000;
+  const CLAVE = location.hash.slice(1);   // la clave va tras el # y nunca llega al servidor de la página
+  const $ = id => document.getElementById(id);
+  let ultimo = null;
+
+  const escapar = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+  const numero = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const conectado = d => !!d && !!d.hora && Date.now() - d.hora + d.edad_s * 1000 < CONECTADO_MS;
+  const fila = (t, v) => '<div class="fila"><b>' + t + '</b><span>' + v + '</span></div>';
+  const suave = t => '<span class="c-suave">' + t + '</span>';
+  const rayas = n => '<span class="rayas" aria-label="Cobertura ' + n + ' de 4">' + [0, 1, 2, 3].map(i => '<i class="' + (i < n ? 'on' : '') + '"></i>').join('') + '</span>';
+  const rayasLora = r => r > -90 ? 4 : r > -100 ? 3 : r > -110 ? 2 : 1;
+  const rayasWifi = r => r > -55 ? 4 : r > -65 ? 3 : r > -75 ? 2 : r > -85 ? 1 : 0;
+
+  function nodo(id, titulo, d, otro) {
+    const ok = conectado(d);
+    let lora = suave('Sin señal');
+    if (ok && conectado(otro) && d.rssi_lora) {
+      const q = d.rssi_lora > -90 ? ['Muy buena', 'c-verde'] : d.rssi_lora > -110 ? ['Buena', 'c-naranja'] : ['Mala', 'c-rojo'];
+      lora = '<span class="' + q[1] + '">' + d.rssi_lora + ' dB · ' + q[0] + '</span>' + rayas(rayasLora(d.rssi_lora));
+    }
+    let wifi = suave(ok ? 'Por LoRa' : 'Sin datos');
+    if (d && d.wifi_hora && Date.now() - d.wifi_hora < CONECTADO_MS) wifi = escapar(d.wifi_red || 'Conectado') + rayas(rayasWifi(d.rssi_wifi));
+    let gps = suave('Sin conectar');
+    if (d && d.gps) gps = d.fix ? d.sats + ' satélites · ' + Math.round(d.vel) + ' km/h' : 'Buscando · ' + d.sats + ' satélites';
+    let posicion = suave('Sin posición');
+    if (d && d.lat !== undefined) {
+      const c = d.lat.toFixed(5) + ',' + d.lon.toFixed(5);
+      posicion = '<a href="https://www.google.com/maps?q=' + c + '" target="_blank" rel="noopener">' + c.replace(',', ', ') + '</a>';
+    }
+    const corriente = !d ? suave('Sin datos') : d.placa_v ? d.placa_v.toFixed(2) + ' V' : 'USB';
+    $(id).innerHTML = '<div class="cabecera"><h2>' + titulo + '</h2><span class="pastilla ' + (ok ? 'si' : 'no') + '">' + (ok ? 'CONECTADO' : 'NO CONECTADO') + '</span></div>' +
+      fila('Wi-Fi', wifi) + fila('LoRa', lora) + fila('GPS', gps) + fila('Posición', posicion) + fila('Alimentación', corriente);
+  }
+
+  function auxiliar(b) {
+    $('auxiliar').hidden = !b;
+    if (!b) return;
+    const ok = !!b.hora && Date.now() - b.hora + b.edad_s * 1000 < 120000;
+    $('auxiliar').innerHTML = '<div class="cabecera"><h2>Lector de voltaje</h2><span class="pastilla ' + (ok ? 'si' : 'no') + '">' + (ok ? 'CONECTADO' : 'NO CONECTADO') + '</span></div>' +
+      fila('Voltaje', ok ? b.voltios.toFixed(2) + ' V' : suave('Sin datos')) + fila('Relé', ok ? (b.rele ? 'Encendido' : 'Apagado') : suave('Sin datos'));
+  }
+
+  function pintar(e) {
+    e = e || {};
+    nodo('nodo1', 'BATERIA 1', e.furgoneta, e.coche);
+    nodo('nodo2', 'BATERIA 2', e.coche, e.furgoneta);
+    auxiliar(e.bateria);
+  }
+
+  // Solo se aceptan números y valores conocidos: los datos nunca se tratan como código de la página
+  function limpiarNodo(d) {
+    if (!d || typeof d !== 'object') return undefined;
+    const r = { hora: numero(d.hora), edad_s: numero(d.edad_s), gps: d.gps === true, fix: d.fix === true, sats: numero(d.sats), vel: numero(d.vel), placa_v: numero(d.placa_v), rssi_lora: numero(d.rssi_lora), rssi_wifi: numero(d.rssi_wifi), wifi_hora: numero(d.wifi_hora), wifi_red: typeof d.wifi_red === 'string' ? d.wifi_red.slice(0, 32) : '' };
+    if (d.lat !== undefined && Number.isFinite(Number(d.lat)) && Number.isFinite(Number(d.lon))) { r.lat = Number(d.lat); r.lon = Number(d.lon); }
+    return r;
+  }
+  function limpiar(e) {
+    if (!e || typeof e !== 'object') return {};
+    const b = e.bateria && typeof e.bateria === 'object' ? { voltios: numero(e.bateria.voltios), rele: e.bateria.rele === true, hora: numero(e.bateria.hora), edad_s: numero(e.bateria.edad_s) } : undefined;
+    return { coche: limpiarNodo(e.coche), furgoneta: limpiarNodo(e.furgoneta), bateria: b };
+  }
+
+  async function leer() {
+    try {
+      const r = await fetch(BASE + encodeURIComponent(CLAVE) + '/estado.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      ultimo = limpiar(await r.json());
+      $('red').textContent = 'En línea';
+      $('red').className = 'pastilla si';
+    } catch (err) {
+      $('red').textContent = 'Sin conexión';
+      $('red').className = 'pastilla no';
+    }
+    // También sin internet: lo que deja de actualizarse tiene que pasar a rojo
+    pintar(ultimo);
+  }
+
+  pintar();
+  if (CLAVE.length < 24) {
+    $('aviso').hidden = false;
+    $('aviso').textContent = 'Abre esta página con tu enlace completo.';
+    $('red').hidden = true;
+  } else {
+    leer();
+    setInterval(leer, CADA_MS);
+  }
+</script>
+</body>
+</html>
