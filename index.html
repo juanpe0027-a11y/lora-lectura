@@ -5,99 +5,275 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#0d1117">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
-<title>Lectura LoRa</title>
+<meta name="theme-color" content="#0b1c30">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Baterías">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://unpkg.com; script-src 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
+<title>Monitor de baterías</title>
 <style>
-  :root { --fondo:#0d1117; --tarjeta:#161b22; --tarjeta2:#1f2630; --borde:#2b333d; --texto:#f0f3f6; --suave:#9aa6b2; --verde:#3fb950; --verde-f:#143d22; --rojo:#f85149; --rojo-f:#4a1c1b; --naranja:#f0a13a; --naranja-f:#46311a; --azul:#58a6ff; }
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) { --fondo:#f4f6f8; --tarjeta:#ffffff; --tarjeta2:#eef1f4; --borde:#d9dee4; --texto:#1b222a; --suave:#5d6875; --verde:#1a7f37; --verde-f:#dcf5e3; --rojo:#c9302a; --rojo-f:#fde5e4; --naranja:#a8620a; --naranja-f:#fbedd8; --azul:#0969da; }
-  }
-  * { box-sizing:border-box; }
+  :root { --fondo:#0b1c30; --tarjeta:rgba(12,27,46,.88); --tarjeta2:rgba(255,255,255,.07); --borde:rgba(255,255,255,.14); --texto:#f3f7fb; --suave:#b3c1d0; --verde:#43d17f; --verde-f:rgba(67,209,127,.16); --rojo:#ff6b6b; --rojo-f:rgba(255,107,107,.17); --naranja:#f7b23b; --naranja-f:rgba(247,178,59,.17); --azul:#62bcff; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   [hidden] { display:none !important; }
-  body { margin:0; background:var(--fondo); color:var(--texto); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  main { max-width:760px; margin:0 auto; padding:16px 16px 32px; display:grid; gap:12px; grid-template-columns:minmax(0,1fr); }
-  header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:4px 2px 6px; }
-  h1 { margin:0; font-size:21px; font-weight:700; letter-spacing:-.01em; }
-  h2 { margin:0; font-size:17px; font-weight:650; }
-  .pastilla { display:inline-flex; align-items:center; gap:7px; padding:4px 11px; border-radius:99px; font-size:13px; font-weight:650; white-space:nowrap; }
+  html { color-scheme:dark; }
+  body { margin:0; min-height:100vh; background:var(--fondo); color:var(--texto); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  body::before { content:""; position:fixed; inset:0; z-index:-2; background:url(assets/nave.jpg) center 35%/cover no-repeat; }
+  body::after { content:""; position:fixed; inset:0; z-index:-1; background:linear-gradient(180deg,rgba(9,22,39,.42),rgba(9,22,39,.58) 45%,rgba(9,22,39,.74)); }
+  .marco { max-width:1160px; margin:0 auto; padding:14px 16px 40px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  .logo { display:block; background:#fff; border-radius:10px; padding:7px 11px; line-height:0; flex:none; }
+  .logo img { height:36px; width:auto; }
+  .cab-der { display:flex; align-items:center; gap:10px; min-width:0; }
+  .producto { color:var(--texto); font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.7); }
+  h1 { margin:0; font-size:25px; font-weight:750; letter-spacing:-.015em; text-shadow:0 1px 6px rgba(0,0,0,.75); }
+  h2 { margin:0; font-size:18px; font-weight:700; }
+  .pastilla { display:inline-flex; align-items:center; gap:7px; padding:4px 11px; border-radius:99px; font-size:13px; font-weight:650; white-space:nowrap; box-shadow:inset 0 0 0 99px rgba(9,22,39,.72); }
   .pastilla::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
   .si { color:var(--verde); background:var(--verde-f); }
   .no { color:var(--rojo); background:var(--rojo-f); }
-  .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:14px; padding:16px; min-width:0; }
-  .cabecera { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
-  .aviso { color:var(--naranja); background:var(--naranja-f); border-radius:10px; padding:10px 12px; font-size:14px; }
-  .fila { display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:42px; padding:7px 0; border-top:1px solid var(--borde); }
-  .fila b { color:var(--suave); font-weight:550; font-size:14px; flex:none; }
-  .fila span { text-align:right; overflow-wrap:anywhere; font-weight:550; font-size:15px; }
-  .fila a { color:var(--azul); }
+  .ojo { color:var(--naranja); background:var(--naranja-f); }
+  .marca-demo { display:inline-block; padding:3px 9px; border-radius:7px; background:var(--naranja); color:#20160a; font-size:13px; font-weight:800; letter-spacing:.05em; }
+  .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:16px; padding:18px; min-width:0; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .rejilla-inicio { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); }
+  .baterias { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); align-content:start; }
+  .titulo-pagina { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }
+  .titulo-izq { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-width:0; }
+  .boton { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:9px 15px; border-radius:11px; border:1px solid var(--borde); background:rgba(24,41,62,.94); color:var(--texto); font:inherit; font-weight:650; font-size:15px; text-decoration:none; cursor:pointer; }
+  .boton:hover { background:rgba(44,64,88,.96); }
+  .boton:focus-visible, .baldosa:focus-visible, .alarma:focus-visible, summary:focus-visible, .entrar:focus-visible { outline:2px solid var(--azul); outline-offset:2px; }
+  .boton.principal { background:var(--naranja); border-color:var(--naranja); color:#20160a; }
+  .boton.principal:hover { background:#ffc35c; }
+  .entrar { display:block; width:100%; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; border-radius:8px; }
+  .entrar .cabecera { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .nombre { font-size:21px; font-weight:750; }
+  .nombre::after { content:"›"; color:var(--suave); margin-left:8px; }
+  .resumen { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:14px; }
+  .dato { min-width:0; }
+  .dato small { display:block; color:var(--suave); font-size:13px; }
+  .dato span { display:block; font-weight:600; font-size:15px; overflow-wrap:anywhere; }
+  .pie-tarjeta { display:flex; justify-content:flex-end; margin-top:14px; }
+  .aviso { color:var(--naranja); background:rgba(43,32,12,.93); border-radius:11px; padding:10px 13px; font-size:14px; margin-bottom:14px; }
+  .panel-demo p { margin:10px 0 14px; color:var(--suave); font-size:15px; }
+  .cuentas { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:14px; }
+  .cuenta { background:var(--tarjeta2); border-radius:11px; padding:9px 6px; text-align:center; }
+  .cuenta strong { display:block; font-size:24px; line-height:1.15; font-variant-numeric:tabular-nums; }
+  .cuenta small { color:var(--suave); font-size:12.5px; }
+  .ancha { width:100%; }
+  .pila { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); }
+  details > summary { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; list-style:none; font-size:18px; font-weight:700; border-radius:8px; }
+  details > summary::-webkit-details-marker { display:none; }
+  details > summary::after { content:"▾"; color:var(--suave); font-size:14px; }
+  details[open] > summary::after { content:"▴"; }
+  .filas { margin-top:10px; border-top:1px solid var(--borde); }
+  .fila { display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:42px; padding:7px 0; border-bottom:1px solid var(--borde); }
+  .fila:last-child { border-bottom:0; padding-bottom:0; }
+  .fila b { color:var(--suave); font-weight:550; font-size:14px; flex:none; max-width:55%; }
+  .fila span { text-align:right; overflow-wrap:anywhere; font-weight:600; font-size:15px; }
   .c-verde { color:var(--verde); } .c-naranja { color:var(--naranja); } .c-rojo { color:var(--rojo); } .c-suave { color:var(--suave); }
   .rayas { display:inline-flex; align-items:flex-end; gap:3px; height:18px; vertical-align:-3px; margin-left:8px; }
   .rayas i { width:5px; background:var(--borde); border-radius:1px; }
   .rayas i.on { background:var(--verde); }
   .rayas i:nth-child(1){height:5px}.rayas i:nth-child(2){height:9px}.rayas i:nth-child(3){height:13px}.rayas i:nth-child(4){height:18px}
-  @media (min-width:640px) { main { grid-template-columns:repeat(2,minmax(0,1fr)); } .ancho { grid-column:1 / -1; } }
+  .mapa { width:100%; height:62vh; min-height:340px; border-radius:13px; overflow:hidden; background:#16283d; color:#20262e; }
+  .mapa.bajo { height:320px; min-height:0; }
+  .sin-mapa { display:flex; align-items:center; justify-content:center; height:100%; padding:20px; color:var(--suave); text-align:center; }
+  .barra-mapa { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
+  .alarmas { display:grid; gap:7px; margin-top:12px; }
+  .alarma { display:flex; align-items:center; gap:10px; width:100%; min-height:46px; padding:8px 12px; border:0; border-radius:11px; color:var(--texto); font:inherit; font-size:14.5px; text-align:left; cursor:pointer; }
+  .alarma.n2 { background:rgba(74,24,28,.95); }
+  .alarma.n1 { background:rgba(62,46,14,.95); }
+  .alarma b { flex:none; }
+  .n2 > b { color:var(--rojo); } .n1 > b { color:var(--naranja); }
+  .baldosas { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:8px; margin-top:12px; }
+  .baldosa { display:block; padding:9px 10px; border:1px solid var(--borde); border-left:5px solid var(--verde); border-radius:10px; background:var(--tarjeta2); color:inherit; font:inherit; text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; }
+  .baldosa:hover { background:rgba(255,255,255,.13); }
+  .baldosa strong { display:block; font-size:15px; }
+  .baldosa span { display:block; font-size:13px; color:var(--suave); }
+  .baldosa.n1 { border-left-color:var(--naranja); background:var(--naranja-f); }
+  .baldosa.n2 { border-left-color:var(--rojo); background:var(--rojo-f); }
+  .baldosa em { display:block; font-style:normal; font-size:12.5px; font-weight:700; }
+  .baldosa.n0 em { color:var(--verde); } .baldosa.n1 em { color:var(--naranja); } .baldosa.n2 em { color:var(--rojo); }
+  .celdas { display:grid; grid-template-columns:repeat(auto-fill,minmax(68px,1fr)); gap:6px; margin-top:10px; }
+  .celda { padding:6px 7px; border-radius:8px; background:var(--tarjeta2); font-variant-numeric:tabular-nums; }
+  .celda small { display:block; color:var(--suave); font-size:11.5px; }
+  .celda span { font-weight:650; font-size:14px; }
+  .celda.n1 { background:var(--naranja-f); } .celda.n1 span { color:var(--naranja); }
+  .celda.n2 { background:var(--rojo-f); } .celda.n2 span { color:var(--rojo); }
+  .acciones { display:flex; flex-wrap:wrap; gap:8px; }
+  @media (min-width:900px) {
+    .rejilla-inicio { grid-template-columns:minmax(0,1fr) 340px; }
+    .baterias { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .dos-col { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start; }
+    .marco { padding-top:20px; }
+    .resumen { grid-template-columns:minmax(0,1fr); }
+  }
+  @media (max-width:420px) { .producto { display:none; } .logo img { height:30px; } }
 </style>
 </head>
 <body>
-<main>
-  <header class="ancho"><h1>Lectura LoRa</h1><span id="red" class="pastilla no">Cargando</span></header>
-  <div id="aviso" class="aviso ancho" hidden></div>
-  <section class="tarjeta" id="nodo1"></section>
-  <section class="tarjeta" id="nodo2"></section>
-  <section class="tarjeta ancho" id="auxiliar" hidden></section>
-</main>
+<div class="marco">
+  <header>
+    <button id="ir-inicio" class="logo" type="button" aria-label="Ir al inicio" style="border:0;cursor:pointer"><img src="assets/logo.png" alt="Endurance"></button>
+    <div class="cab-der"><span class="producto">Monitor de baterías</span><span id="red" class="pastilla no">Sin enlace</span></div>
+  </header>
+
+  <main id="v-inicio">
+    <div id="aviso" class="aviso" hidden></div>
+    <div class="rejilla-inicio">
+      <div class="baterias">
+        <article class="tarjeta" id="tarjeta-1"></article>
+        <article class="tarjeta" id="tarjeta-2"></article>
+      </div>
+      <aside class="tarjeta panel-demo" aria-labelledby="t-demo">
+        <div class="titulo-izq"><span class="marca-demo">DEMO</span><h2 id="t-demo">Parque de baterías</h2></div>
+        <p>Dos polígonos con 15 y 23 baterías. Todos los datos son simulados.</p>
+        <div class="cuentas" id="cuentas-inicio"></div>
+        <button class="boton principal ancha" type="button" data-ir="demo">Abrir DEMO</button>
+      </aside>
+    </div>
+  </main>
+
+  <main id="v-bateria" hidden>
+    <div class="titulo-pagina">
+      <div class="titulo-izq"><button class="boton" type="button" data-volver>‹ Volver</button><h1 id="bat-titulo"></h1><span id="bat-estado"></span></div>
+      <button class="boton principal" type="button" id="bat-gps">GPS · Ver en el mapa</button>
+    </div>
+    <div class="pila dos-col">
+      <details class="tarjeta" open><summary>Ajustes</summary><div class="filas" id="bat-ajustes"></div></details>
+      <details class="tarjeta" open><summary>Datos del BMS <span class="pastilla no" style="margin-left:auto">NO CONECTADO</span></summary><div id="bat-bms"></div></details>
+    </div>
+  </main>
+
+  <main id="v-mapa" hidden>
+    <div class="titulo-pagina">
+      <div class="titulo-izq"><button class="boton" type="button" data-volver>‹ Volver</button><span id="mapa-demo" class="marca-demo" hidden>DEMO</span><h1 id="mapa-titulo"></h1></div>
+    </div>
+    <section class="tarjeta">
+      <div id="mapa-vacio" class="aviso" hidden style="margin:0"></div>
+      <div id="mapa-pos" class="mapa"></div>
+      <div class="barra-mapa"><span id="mapa-nota" class="producto"></span><a id="mapa-google" class="boton" target="_blank" rel="noopener">Abrir en Google Maps</a></div>
+    </section>
+  </main>
+
+  <main id="v-demo" hidden>
+    <div class="titulo-pagina">
+      <div class="titulo-izq"><button class="boton" type="button" data-volver>‹ Volver</button><span class="marca-demo">DEMO</span><h1>Parque de baterías</h1></div>
+      <div class="acciones"><button class="boton" type="button" id="demo-fallo">Simular bajada de celda</button><button class="boton" type="button" id="demo-reset">Reiniciar</button></div>
+    </div>
+    <div class="aviso">Datos, ubicaciones y umbrales de alarma inventados para esta demostración. Nada de esto se guarda en la base de datos.</div>
+    <div class="pila">
+      <section class="tarjeta"><div id="mapa-parque" class="mapa bajo"></div></section>
+      <section class="tarjeta" aria-labelledby="t-alarmas">
+        <div class="titulo-izq"><h2 id="t-alarmas">Alarmas activas</h2><span id="n-alarmas"></span></div>
+        <div class="alarmas" id="lista-alarmas" aria-live="polite"></div>
+      </section>
+      <section class="tarjeta" id="pol-A"></section>
+      <section class="tarjeta" id="pol-B"></section>
+    </div>
+  </main>
+
+  <main id="v-pack" hidden>
+    <div class="titulo-pagina">
+      <div class="titulo-izq"><button class="boton" type="button" data-volver>‹ Volver</button><span class="marca-demo">DEMO</span><h1 id="pack-titulo"></h1><span id="pack-estado"></span></div>
+      <button class="boton principal" type="button" id="pack-gps">GPS · Ver en el mapa</button>
+    </div>
+    <div class="pila">
+      <div class="alarmas" id="pack-alarmas" style="margin:0"></div>
+      <div class="pila dos-col">
+        <details class="tarjeta" open><summary>Ajustes</summary><div class="filas" id="pack-ajustes"></div></details>
+        <details class="tarjeta" open><summary>Datos del BMS</summary><div id="pack-bms"></div></details>
+      </div>
+      <section class="tarjeta"><h2>Tensión por celda</h2><div class="celdas" id="pack-celdas"></div></section>
+    </div>
+  </main>
+</div>
 <script>
   // Solo lectura: esta página no escribe nada en la base de datos
   const BASE = 'https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app/v/';
-  const CONECTADO_MS = 45000, CADA_MS = 5000;
+  const CONECTADO_MS = 45000, CADA_MS = 5000, CADA_DEMO_MS = 3000;
   const CLAVE = location.hash.slice(1);   // la clave va tras el # y nunca llega al servidor de la página
   const $ = id => document.getElementById(id);
-  let ultimo = null;
+  let ultimo = null, vista = 'inicio', actual = null;
 
   const escapar = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
   const numero = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const decimal = (n, d) => n.toFixed(d).replace('.', ',');
   const conectado = d => !!d && !!d.hora && Date.now() - d.hora + d.edad_s * 1000 < CONECTADO_MS;
   const fila = (t, v) => '<div class="fila"><b>' + t + '</b><span>' + v + '</span></div>';
   const suave = t => '<span class="c-suave">' + t + '</span>';
+  const pastilla = ok => '<span class="pastilla ' + (ok ? 'si' : 'no') + '">' + (ok ? 'CONECTADO' : 'NO CONECTADO') + '</span>';
   const rayas = n => '<span class="rayas" aria-label="Cobertura ' + n + ' de 4">' + [0, 1, 2, 3].map(i => '<i class="' + (i < n ? 'on' : '') + '"></i>').join('') + '</span>';
   const rayasLora = r => r > -90 ? 4 : r > -100 ? 3 : r > -110 ? 2 : 1;
   const rayasWifi = r => r > -55 ? 4 : r > -65 ? 3 : r > -75 ? 2 : r > -85 ? 1 : 0;
 
-  function nodo(id, titulo, d, otro) {
-    const ok = conectado(d);
-    let lora = suave('Sin señal');
-    if (ok && conectado(otro) && d.rssi_lora) {
-      const q = d.rssi_lora > -90 ? ['Muy buena', 'c-verde'] : d.rssi_lora > -110 ? ['Buena', 'c-naranja'] : ['Mala', 'c-rojo'];
-      lora = '<span class="' + q[1] + '">' + d.rssi_lora + ' dB · ' + q[0] + '</span>' + rayas(rayasLora(d.rssi_lora));
-    }
-    let wifi = suave(ok ? 'Por LoRa' : 'Sin datos');
-    if (d && d.wifi_hora && Date.now() - d.wifi_hora < CONECTADO_MS) wifi = escapar(d.wifi_red || 'Conectado') + rayas(rayasWifi(d.rssi_wifi));
-    let gps = suave('Sin conectar');
-    if (d && d.gps) gps = d.fix ? d.sats + ' satélites · ' + Math.round(d.vel) + ' km/h' : 'Buscando · ' + d.sats + ' satélites';
-    let posicion = suave('Sin posición');
-    if (d && d.lat !== undefined) {
-      const c = d.lat.toFixed(5) + ',' + d.lon.toFixed(5);
-      posicion = '<a href="https://www.google.com/maps?q=' + c + '" target="_blank" rel="noopener">' + c.replace(',', ', ') + '</a>';
-    }
-    const corriente = !d ? suave('Sin datos') : d.placa_v ? d.placa_v.toFixed(2) + ' V' : 'USB';
-    $(id).innerHTML = '<div class="cabecera"><h2>' + titulo + '</h2><span class="pastilla ' + (ok ? 'si' : 'no') + '">' + (ok ? 'CONECTADO' : 'NO CONECTADO') + '</span></div>' +
-      fila('Wi-Fi', wifi) + fila('LoRa', lora) + fila('GPS', gps) + fila('Posición', posicion) + fila('Alimentación', corriente);
+  function hace(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return 'hace ' + s + ' s';
+    if (s < 3600) return 'hace ' + Math.round(s / 60) + ' min';
+    if (s < 86400) return 'hace ' + Math.round(s / 3600) + ' h';
+    return 'hace ' + Math.round(s / 86400) + ' d';
+  }
+  const ultimoDato = d => d && d.hora ? hace(Date.now() - d.hora + d.edad_s * 1000) : '';
+
+  // --- Baterías reales ---
+  const REALES = { 1: { titulo: 'BATERÍA 1', nodo: 'furgoneta', otro: 'coche' }, 2: { titulo: 'BATERÍA 2', nodo: 'coche', otro: 'furgoneta' } };
+  const datosReal = n => { const e = ultimo || {}; return { d: e[REALES[n].nodo], otro: e[REALES[n].otro] }; };
+
+  function textoLora(d, otro) {
+    if (!conectado(d) || !conectado(otro) || !d.rssi_lora) return suave('Sin señal');
+    const q = d.rssi_lora > -90 ? ['Muy buena', 'c-verde'] : d.rssi_lora > -110 ? ['Buena', 'c-naranja'] : ['Mala', 'c-rojo'];
+    return '<span class="' + q[1] + '">' + d.rssi_lora + ' dB · ' + q[0] + '</span>' + rayas(rayasLora(d.rssi_lora));
+  }
+  function textoWifi(d) {
+    if (d && d.wifi_hora && Date.now() - d.wifi_hora < CONECTADO_MS) return escapar(d.wifi_red || 'Conectado') + rayas(rayasWifi(d.rssi_wifi));
+    return suave(conectado(d) ? 'Por LoRa' : 'Sin datos');
+  }
+  function textoGps(d) {
+    if (!d || !d.gps) return suave('Sin conectar');
+    return d.fix ? d.sats + ' satélites · ' + Math.round(d.vel) + ' km/h' : 'Buscando · ' + d.sats + ' satélites';
+  }
+  function textoCorriente(d) {
+    if (!d) return suave('Sin datos');
+    return d.placa_v ? decimal(d.placa_v, 2) + ' V' : 'USB';
+  }
+  const coordenadas = p => decimal(p.lat, 5) + ', ' + decimal(p.lon, 5);
+
+  function pintarTarjeta(n) {
+    const { d, otro } = datosReal(n), ok = conectado(d), caja = $('tarjeta-' + n);
+    const foco = document.activeElement && caja.contains(document.activeElement) ? document.activeElement.dataset.foco : null;
+    caja.innerHTML = '<button class="entrar" type="button" data-foco="entrar" data-bateria="' + n + '"><div class="cabecera"><span class="nombre">' + REALES[n].titulo + '</span>' + pastilla(ok) + '</div>' +
+      '<div class="resumen">' +
+      '<div class="dato"><small>Enlace LoRa</small><span>' + textoLora(d, otro) + '</span></div>' +
+      '<div class="dato"><small>Posicionamiento</small><span>' + textoGps(d) + '</span></div>' +
+      '<div class="dato"><small>Último dato</small><span>' + (ultimoDato(d) || suave('Sin datos')) + '</span></div>' +
+      '<div class="dato"><small>BMS</small><span class="c-suave">No conectado</span></div>' +
+      '</div></button><div class="pie-tarjeta"><button class="boton" type="button" data-foco="gps" data-gps="' + n + '">GPS</button></div>';
+    if (foco) caja.querySelector('[data-foco="' + foco + '"]').focus();
   }
 
-  function auxiliar(b) {
-    $('auxiliar').hidden = !b;
-    if (!b) return;
-    const ok = !!b.hora && Date.now() - b.hora + b.edad_s * 1000 < 120000;
-    $('auxiliar').innerHTML = '<div class="cabecera"><h2>Lector de voltaje</h2><span class="pastilla ' + (ok ? 'si' : 'no') + '">' + (ok ? 'CONECTADO' : 'NO CONECTADO') + '</span></div>' +
-      fila('Voltaje', ok ? b.voltios.toFixed(2) + ' V' : suave('Sin datos')) + fila('Relé', ok ? (b.rele ? 'Encendido' : 'Apagado') : suave('Sin datos'));
+  function filasAjustes(d, otro) {
+    let pos = suave('Sin posición');
+    if (d && d.lat !== undefined) pos = coordenadas(d);
+    return fila('Wi-Fi', textoWifi(d)) + fila('Enlace LoRa', textoLora(d, otro)) + fila('Posicionamiento', textoGps(d)) + fila('Posición', pos) + fila('Alimentación', textoCorriente(d));
   }
 
-  function pintar(e) {
-    e = e || {};
-    nodo('nodo1', 'BATERIA 1', e.furgoneta, e.coche);
-    nodo('nodo2', 'BATERIA 2', e.coche, e.furgoneta);
-    auxiliar(e.bateria);
+  // Lo esencial de cualquier BMS. "valor" solo se usa en la DEMO
+  const CAMPOS_BMS = [['tension', 'Tensión total'], ['corriente', 'Corriente'], ['soc', 'Carga (SoC)'], ['soh', 'Salud (SoH)'], ['vMax', 'Celda más alta'], ['vMin', 'Celda más baja'], ['deseq', 'Diferencia entre celdas'], ['tMax', 'Temperatura máxima'], ['alarmas', 'Alarmas']];
+  function filasBms(valor) {
+    return '<div class="filas">' + CAMPOS_BMS.map(c => fila(c[1], valor ? valor(c[0]) : suave('No conectado'))).join('') + '</div>';
+  }
+
+  function pintarDetalle() {
+    if (vista !== 'bateria') return;
+    const { d, otro } = datosReal(actual);
+    $('bat-titulo').textContent = REALES[actual].titulo;
+    $('bat-estado').innerHTML = pastilla(conectado(d));
+    $('bat-ajustes').innerHTML = filasAjustes(d, otro);
+  }
+
+  function pintar() {
+    pintarTarjeta(1); pintarTarjeta(2); pintarDetalle();
+    if (vista === 'mapa') pintarMapa();
   }
 
   // Solo se aceptan números y valores conocidos: los datos nunca se tratan como código de la página
@@ -109,29 +285,284 @@
   }
   function limpiar(e) {
     if (!e || typeof e !== 'object') return {};
-    const b = e.bateria && typeof e.bateria === 'object' ? { voltios: numero(e.bateria.voltios), rele: e.bateria.rele === true, hora: numero(e.bateria.hora), edad_s: numero(e.bateria.edad_s) } : undefined;
-    return { coche: limpiarNodo(e.coche), furgoneta: limpiarNodo(e.furgoneta), bateria: b };
+    return { coche: limpiarNodo(e.coche), furgoneta: limpiarNodo(e.furgoneta) };
   }
 
   async function leer() {
     try {
       const r = await fetch(BASE + encodeURIComponent(CLAVE) + '/estado.json', { cache: 'no-store' });
       if (!r.ok) throw new Error(r.status);
-      ultimo = limpiar(await r.json());
-      $('red').textContent = 'En línea';
-      $('red').className = 'pastilla si';
+      const datos = await r.json();
+      ultimo = limpiar(datos);
+      // Firebase responde vacío, sin error, si el enlace está mal copiado
+      $('red').textContent = datos ? 'En línea' : 'Enlace sin datos';
+      $('red').className = 'pastilla ' + (datos ? 'si' : 'ojo');
     } catch (err) {
       $('red').textContent = 'Sin conexión';
       $('red').className = 'pastilla no';
     }
     // También sin internet: lo que deja de actualizarse tiene que pasar a rojo
-    pintar(ultimo);
+    pintar();
   }
 
+  // --- Mapa: se carga solo al necesitarlo; si falla, el resto de la aplicación sigue funcionando ---
+  let promesaLeaflet = null;
+  function cargarLeaflet() {
+    if (promesaLeaflet) return promesaLeaflet;
+    promesaLeaflet = new Promise((ok, mal) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      css.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+      css.crossOrigin = '';
+      document.head.appendChild(css);
+      const js = document.createElement('script');
+      js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      js.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+      js.crossOrigin = '';
+      js.onload = () => ok(window.L);
+      js.onerror = () => { promesaLeaflet = null; mal(new Error('mapa')); };
+      document.head.appendChild(js);
+    });
+    return promesaLeaflet;
+  }
+  function crearMapa(L, id) {
+    const m = L.map(id);
+    // OpenStreetMap exige saber desde qué sitio se pide; el enlace privado nunca viaja, solo el dominio
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, referrerPolicy: 'origin', attribution: '&copy; OpenStreetMap' }).addTo(m);
+    return m;
+  }
+  const mapaNoDisponible = id => { $(id).innerHTML = '<div class="sin-mapa">No se ha podido cargar el mapa. Revisa la conexión.</div>'; };
+
+  let mapaPos = null, puntoPos = null, destinoMapa = null;
+  function posicionDestino() {
+    if (!destinoMapa) return null;
+    if (destinoMapa.demo) {
+      const b = demoPorId(destinoMapa.demo);
+      return { lat: b.lat, lon: b.lon, titulo: b.id, nota: 'Ubicación inventada para la DEMO · ' + coordenadas(b), color: colorNivel(evaluar(b).nivel), demo: true };
+    }
+    const r = REALES[destinoMapa.real], { d } = datosReal(destinoMapa.real);
+    if (!d || d.lat === undefined) return { titulo: r.titulo, vacio: true };
+    const vivo = conectado(d) && d.fix;
+    const nota = vivo ? 'Posición actual · ' + coordenadas(d) : 'Última posición conocida · ' + coordenadas(d) + ' · Último dato de la placa ' + ultimoDato(d);
+    return { lat: d.lat, lon: d.lon, titulo: r.titulo, nota, color: vivo ? '#43d17f' : '#f7b23b' };
+  }
+  function pintarMapa() {
+    const p = posicionDestino();
+    if (!p) return;
+    $('mapa-titulo').textContent = p.titulo;
+    $('mapa-demo').hidden = !p.demo;
+    $('mapa-vacio').hidden = !p.vacio;
+    $('mapa-pos').hidden = !!p.vacio;
+    $('mapa-google').hidden = !!p.vacio;
+    $('mapa-nota').textContent = p.nota || '';
+    if (p.vacio) {
+      $('mapa-vacio').textContent = 'Esta batería todavía no ha enviado ninguna posición. Aparecerá aquí cuando su GPS consiga una lectura.';
+      return;
+    }
+    $('mapa-google').href = 'https://www.google.com/maps?q=' + p.lat.toFixed(5) + ',' + p.lon.toFixed(5);
+    cargarLeaflet().then(L => {
+      const nuevo = !mapaPos;
+      if (nuevo) mapaPos = crearMapa(L, 'mapa-pos');
+      mapaPos.invalidateSize();
+      if (!puntoPos) puntoPos = L.circleMarker([p.lat, p.lon], { radius: 10, weight: 3, color: '#fff', fillOpacity: 1 }).addTo(mapaPos);
+      puntoPos.setLatLng([p.lat, p.lon]).setStyle({ fillColor: p.color });
+      if (nuevo || destinoMapa.centrar) { mapaPos.setView([p.lat, p.lon], 16); destinoMapa.centrar = false; }
+    }).catch(() => mapaNoDisponible('mapa-pos'));
+  }
+
+  // --- DEMO: todo se simula aquí mismo y no se escribe nada ---
+  const AVISO_V = 3.0, CRITICO_V = 2.8, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
+  const POLIGONOS = [
+    { id: 'A', nombre: 'Polígono A', modelo: 'wBMS-R24', celdas: 24, sondas: 6, n: 15, lat: 39.5165, lon: -0.4445, d: 0.0034 },
+    { id: 'B', nombre: 'Polígono B', modelo: 'wBMS-R32', celdas: 32, sondas: 10, n: 23, lat: 39.5340, lon: -0.5325, d: 0.0044 },
+  ];
+  let demo = [];
+  const demoPorId = id => demo.find(b => b.id === id);
+  const azar = (a, b) => a + Math.random() * (b - a);
+  const colorNivel = n => ['#43d17f', '#f7b23b', '#ff6b6b'][n];
+  const contorno = p => [[p.lat + p.d, p.lon - 2 * p.d], [p.lat + 1.15 * p.d, p.lon + 2 * p.d], [p.lat - p.d, p.lon + 2.25 * p.d], [p.lat - 1.15 * p.d, p.lon - 1.8 * p.d]];
+
+  function crearDemo() {
+    demo = [];
+    POLIGONOS.forEach(p => {
+      const cols = Math.ceil(Math.sqrt(p.n * 2)), filas = Math.ceil(p.n / cols);
+      for (let i = 0; i < p.n; i++) {
+        const c = i % cols, f = Math.floor(i / cols);
+        demo.push({
+          id: p.id + '-' + String(i + 1).padStart(2, '0'), pol: p,
+          lat: p.lat + (filas > 1 ? 0.7 - 1.4 * f / (filas - 1) : 0) * p.d,
+          lon: p.lon + (cols > 1 ? -1.4 + 2.8 * c / (cols - 1) : 0) * p.d,
+          soc: azar(35, 96), soh: azar(88, 99), corriente: azar(-35, 35),
+          margen: Array.from({ length: p.celdas }, () => azar(-0.008, 0.008)),
+          sondasBase: Array.from({ length: p.sondas }, () => azar(-1.5, 1.5)),
+          calor: 0, fallo: null, v: [], t: [],
+        });
+      }
+    });
+    demoPorId('A-04').fallo = { celda: 6, actual: 2.92, objetivo: 2.92 };
+    demoPorId('B-17').fallo = { celda: 11, actual: 2.74, objetivo: 2.74 };
+    demoPorId('B-09').calor = 27;
+    demo.forEach(actualizarBateria);
+  }
+
+  function actualizarBateria(b) {
+    const parada = b.v.length && evaluar(b).nivel === 2;
+    b.corriente = parada ? 0 : Math.max(-60, Math.min(60, b.corriente + azar(-4, 4)));
+    b.soc = Math.max(15, Math.min(98, b.soc + b.corriente * 0.002));
+    const base = 3.2 + 0.0012 * b.soc + b.corriente * 0.0002;
+    b.v = b.margen.map(m => base + m + azar(-0.001, 0.001));
+    if (b.fallo) {
+      const f = b.fallo;
+      f.actual += Math.max(-0.012, Math.min(0.012, f.objetivo - f.actual));
+      b.v[f.celda] = f.actual;
+    }
+    b.t = b.sondasBase.map(m => 24 + Math.abs(b.corriente) * 0.1 + m + b.calor + azar(-0.15, 0.15));
+  }
+
+  function resumenBateria(b) {
+    const vMin = Math.min(...b.v), vMax = Math.max(...b.v);
+    return { vMin, vMax, cMin: b.v.indexOf(vMin) + 1, cMax: b.v.indexOf(vMax) + 1, tMin: Math.min(...b.t), tMax: Math.max(...b.t), total: b.v.reduce((a, v) => a + v, 0) };
+  }
+  function evaluar(b) {
+    const r = resumenBateria(b), lista = [];
+    if (r.vMin < CRITICO_V) lista.push({ nivel: 2, texto: 'Celda ' + r.cMin + ' a ' + decimal(r.vMin, 2) + ' V: por debajo de ' + decimal(CRITICO_V, 2) + ' V' });
+    else if (r.vMin < AVISO_V) lista.push({ nivel: 1, texto: 'Celda ' + r.cMin + ' a ' + decimal(r.vMin, 2) + ' V: por debajo de ' + decimal(AVISO_V, 2) + ' V' });
+    else if (r.vMax - r.vMin > DESEQ_V) lista.push({ nivel: 1, texto: 'Diferencia entre celdas de ' + Math.round((r.vMax - r.vMin) * 1000) + ' mV' });
+    if (r.tMax >= CRITICO_T) lista.push({ nivel: 2, texto: 'Temperatura de ' + decimal(r.tMax, 1) + ' ºC' });
+    else if (r.tMax >= AVISO_T) lista.push({ nivel: 1, texto: 'Temperatura de ' + decimal(r.tMax, 1) + ' ºC' });
+    return { nivel: lista.reduce((n, a) => Math.max(n, a.nivel), 0), lista };
+  }
+
+  function contar(lista) {
+    const c = [0, 0, 0];
+    lista.forEach(b => c[evaluar(b).nivel]++);
+    return c;
+  }
+  const cuentasHtml = c => '<div class="cuenta"><strong class="c-verde">' + c[0] + '</strong><small>Correctas</small></div><div class="cuenta"><strong class="c-naranja">' + c[1] + '</strong><small>Avisos</small></div><div class="cuenta"><strong class="c-rojo">' + c[2] + '</strong><small>Críticas</small></div>';
+
+  function montarPoligonos() {
+    POLIGONOS.forEach(p => {
+      $('pol-' + p.id).innerHTML = '<div class="titulo-izq"><h2>' + p.nombre + ' · ' + p.n + ' baterías</h2><span class="c-suave" style="font-size:14px">' + p.modelo + ' · ' + p.celdas + ' celdas</span></div>' +
+        '<div class="baldosas">' + demo.filter(b => b.pol === p).map(b => '<button class="baldosa n0" type="button" data-pack="' + b.id + '"><strong>' + b.id + '</strong><span data-a></span><span data-b></span><em></em></button>').join('') + '</div>';
+    });
+  }
+
+  let firmaAlarmas = null;
+  function pintarDemo() {
+    $('cuentas-inicio').innerHTML = cuentasHtml(contar(demo));
+    if (vista === 'demo') {
+      demo.forEach(b => {
+        const el = document.querySelector('.baldosa[data-pack="' + b.id + '"]');
+        const r = resumenBateria(b), e = evaluar(b);
+        el.className = 'baldosa n' + e.nivel;
+        el.querySelector('[data-a]').textContent = 'SoC ' + Math.round(b.soc) + ' % · ' + Math.round(r.total) + ' V';
+        el.querySelector('[data-b]').textContent = 'Mín. ' + decimal(r.vMin, 2) + ' V · ' + Math.round(r.tMax) + ' ºC';
+        el.querySelector('em').textContent = ['Correcta', 'Aviso', 'Crítica'][e.nivel];
+      });
+      const alarmas = [];
+      demo.forEach(b => evaluar(b).lista.forEach(a => alarmas.push({ id: b.id, nivel: a.nivel, texto: a.texto })));
+      alarmas.sort((a, b) => b.nivel - a.nivel || a.id.localeCompare(b.id));
+      // Solo se redibuja si cambia algo, para no perder el foco ni repetir el aviso de voz
+      const firma = alarmas.map(a => a.id + a.nivel + a.texto.split(':')[0].replace(/ a .*/, '')).join('|');
+      $('n-alarmas').innerHTML = alarmas.length ? '<span class="pastilla ' + (alarmas.some(a => a.nivel === 2) ? 'no' : 'ojo') + '">' + alarmas.length + '</span>' : '<span class="pastilla si">Sin alarmas</span>';
+      if (firma !== firmaAlarmas) {
+        firmaAlarmas = firma;
+        $('lista-alarmas').innerHTML = alarmas.map(a => '<button class="alarma n' + a.nivel + '" type="button" data-pack="' + a.id + '" data-lista="1"><b>' + a.id + '</b><span></span></button>').join('');
+      }
+      $('lista-alarmas').querySelectorAll('.alarma').forEach((el, i) => { el.querySelector('span').textContent = alarmas[i].texto; });
+      pintarMarcadores();
+    }
+    if (vista === 'pack') pintarPack();
+    if (vista === 'mapa' && destinoMapa && destinoMapa.demo) pintarMapa();
+  }
+
+  function pintarPack() {
+    const b = demoPorId(actual), r = resumenBateria(b), e = evaluar(b);
+    $('pack-titulo').textContent = b.id;
+    $('pack-estado').innerHTML = '<span class="pastilla ' + ['si', 'ojo', 'no'][e.nivel] + '">' + ['CORRECTA', 'AVISO', 'CRÍTICA'][e.nivel] + '</span>';
+    $('pack-alarmas').innerHTML = e.lista.map(a => '<div class="alarma n' + a.nivel + '" style="cursor:default"><b>' + (a.nivel === 2 ? 'Crítica' : 'Aviso') + '</b><span>' + a.texto + '</span></div>').join('');
+    $('pack-alarmas').hidden = !e.lista.length;
+    $('pack-ajustes').innerHTML = fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', 'Simulado') + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(b)) + fila('Alimentación', 'Simulada');
+    const valores = {
+      tension: decimal(r.total, 1) + ' V', corriente: decimal(b.corriente, 1) + ' A', soc: Math.round(b.soc) + ' %', soh: Math.round(b.soh) + ' %',
+      vMax: decimal(r.vMax, 3) + ' V (celda ' + r.cMax + ')', vMin: '<span class="c-' + (r.vMin < CRITICO_V ? 'rojo' : r.vMin < AVISO_V ? 'naranja' : 'verde') + '">' + decimal(r.vMin, 3) + ' V (celda ' + r.cMin + ')</span>',
+      deseq: Math.round((r.vMax - r.vMin) * 1000) + ' mV', tMax: decimal(r.tMax, 1) + ' ºC', alarmas: e.lista.length,
+    };
+    $('pack-bms').innerHTML = filasBms(k => valores[k]);
+    $('pack-celdas').innerHTML = b.v.map((v, i) => '<div class="celda n' + (v < CRITICO_V ? 2 : v < AVISO_V ? 1 : 0) + '"><small>Celda ' + (i + 1) + '</small><span>' + decimal(v, 3) + '</span></div>').join('');
+  }
+
+  let mapaParque = null;
+  const marcadores = {};
+  function pintarMarcadores() {
+    demo.forEach(b => { if (marcadores[b.id]) marcadores[b.id].setStyle({ fillColor: colorNivel(evaluar(b).nivel) }); });
+  }
+  function montarMapaParque() {
+    cargarLeaflet().then(L => {
+      if (vista !== 'demo') return;
+      if (mapaParque) { mapaParque.invalidateSize(); return; }
+      mapaParque = crearMapa(L, 'mapa-parque');
+      const zonas = POLIGONOS.map(p => L.polygon(contorno(p), { color: '#f7b23b', weight: 2, fillOpacity: 0.12 }).bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)').addTo(mapaParque));
+      demo.forEach(b => {
+        marcadores[b.id] = L.circleMarker([b.lat, b.lon], { radius: 6, weight: 1.5, color: '#fff', fillOpacity: 1, fillColor: colorNivel(evaluar(b).nivel) }).bindTooltip(b.id).on('click', () => ir('pack', b.id)).addTo(mapaParque);
+      });
+      const encuadrar = () => mapaParque.fitBounds(L.featureGroup(zonas).getBounds(), { padding: [16, 16] });
+      encuadrar();
+      mapaParque.on('resize', encuadrar);   // al girar el móvil siguen viéndose los dos polígonos
+    }).catch(() => mapaNoDisponible('mapa-parque'));
+  }
+
+  // --- Navegación: el # guarda la clave, así que las pantallas se recuerdan sin tocar la dirección ---
+  const VISTAS = ['inicio', 'bateria', 'mapa', 'demo', 'pack'];
+  function mostrar(v, id, dest) {
+    vista = v; actual = id;
+    if (v === 'mapa') destinoMapa = Object.assign({ centrar: true }, dest);
+    VISTAS.forEach(n => { $('v-' + n).hidden = n !== v; });
+    window.scrollTo(0, 0);
+    if (v === 'bateria') pintarDetalle();
+    if (v === 'mapa') pintarMapa();
+    if (v === 'demo') { firmaAlarmas = null; pintarDemo(); montarMapaParque(); }
+    if (v === 'pack') pintarPack();
+  }
+  function ir(v, id, dest) {
+    history.pushState({ v, id, dest }, '');
+    mostrar(v, id, dest);
+  }
+  window.addEventListener('popstate', ev => { const s = ev.state || { v: 'inicio' }; mostrar(s.v, s.id, s.dest); });
+
+  document.addEventListener('click', ev => {
+    const el = ev.target.closest('[data-ir],[data-volver],[data-bateria],[data-gps],[data-pack]');
+    if (!el) return;
+    if (el.dataset.ir) ir(el.dataset.ir);
+    else if ('volver' in el.dataset) history.back();
+    else if (el.dataset.bateria) ir('bateria', Number(el.dataset.bateria));
+    else if (el.dataset.gps) ir('mapa', null, { real: Number(el.dataset.gps) });
+    else if (el.dataset.pack) ir('pack', el.dataset.pack);
+  });
+  $('ir-inicio').onclick = () => { if (vista !== 'inicio') ir('inicio'); };
+  $('bat-gps').onclick = () => ir('mapa', null, { real: actual });
+  $('pack-gps').onclick = () => ir('mapa', null, { demo: actual });
+  $('demo-reset').onclick = () => { crearDemo(); firmaAlarmas = null; pintarDemo(); };
+  $('demo-fallo').onclick = () => {
+    const sanas = demo.filter(b => !b.fallo && evaluar(b).nivel === 0);
+    if (!sanas.length) return;
+    const b = sanas[Math.floor(Math.random() * sanas.length)];
+    const celda = Math.floor(Math.random() * b.pol.celdas);
+    b.fallo = { celda, actual: b.v[celda], objetivo: 2.72 };
+  };
+
+  // --- Arranque ---
+  history.replaceState({ v: 'inicio' }, '');
+  $('bat-bms').innerHTML = filasBms();
+  crearDemo();
+  montarPoligonos();
   pintar();
+  pintarDemo();
+  setInterval(() => { demo.forEach(actualizarBateria); pintarDemo(); }, CADA_DEMO_MS);
   if (CLAVE.length < 24) {
     $('aviso').hidden = false;
-    $('aviso').textContent = 'Abre esta página con tu enlace completo.';
+    $('aviso').textContent = 'Para ver las baterías reales, abre la aplicación con tu enlace completo. La DEMO funciona sin él.';
     $('red').hidden = true;
   } else {
     leer();
