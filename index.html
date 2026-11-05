@@ -5,235 +5,381 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<meta name="theme-color" content="#0b1c30">
+<meta name="theme-color" content="#070f1c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Baterías">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://unpkg.com; script-src 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
 <title>Monitor de baterías</title>
 <style>
-  :root { --fondo:#0b1c30; --tarjeta:rgba(12,27,46,.94); --tarjeta2:rgba(255,255,255,.07); --borde:rgba(255,255,255,.14); --texto:#f3f7fb; --suave:#b3c1d0; --verde:#43d17f; --verde-f:rgba(67,209,127,.16); --rojo:#ff6b6b; --rojo-f:rgba(255,107,107,.17); --naranja:#f7b23b; --naranja-f:rgba(247,178,59,.17); --azul:#62bcff; }
+  :root { color-scheme:dark; --fondo:#070f1c; --panel:#121e2e; --panel2:#1b2a3c; --panel3:#24364b; --linea:#2c3e53; --texto:#eaf0f6; --suave:#a3b3c5; --verde:#3ddc84; --verde-f:rgba(61,220,132,.14); --naranja:#ffa62b; --naranja-f:rgba(255,166,43,.15); --rojo:#ff6468; --rojo-f:rgba(255,100,104,.16); --turquesa:#2fd6d6; --turquesa-f:rgba(47,214,214,.13); --serie:#3d97e6; --banda:rgba(163,179,197,.26); --rejilla:rgba(255,255,255,.09); --foto:.1; --sobre:#07131f; }
+  :root[data-tema="claro"] { color-scheme:light; --fondo:#e9eef4; --panel:#ffffff; --panel2:#f0f4f8; --panel3:#e2e9f0; --linea:#ccd6e1; --texto:#0f1c2c; --suave:#4c5d73; --verde:#0a7a44; --verde-f:rgba(10,122,68,.11); --naranja:#a85600; --naranja-f:rgba(168,86,0,.11); --rojo:#c4262e; --rojo-f:rgba(196,38,46,.1); --turquesa:#07767d; --turquesa-f:rgba(7,118,125,.1); --serie:#1a6fc2; --banda:rgba(76,93,115,.2); --rejilla:rgba(15,28,44,.1); --foto:.05; --sobre:#ffffff; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   [hidden] { display:none !important; }
-  html { color-scheme:dark; }
-  body { margin:0; min-height:100vh; background:var(--fondo); color:var(--texto); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  body::before { content:""; position:fixed; inset:0; z-index:-2; background:url(assets/nave.jpg) center 35%/cover no-repeat; }
-  body::after { content:""; position:fixed; inset:0; z-index:-1; background:linear-gradient(180deg,rgba(9,22,39,.42),rgba(9,22,39,.58) 45%,rgba(9,22,39,.74)); }
-  .marco { max-width:1160px; margin:0 auto; padding:14px 16px 40px; }
-  header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
-  .logo { display:block; background:#fff; border-radius:10px; padding:7px 11px; line-height:0; flex:none; }
-  .logo img { height:36px; width:auto; }
-  .cab-der { display:flex; align-items:center; gap:10px; min-width:0; }
-  .producto { color:var(--texto); font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.7); }
-  h1 { margin:0; font-size:25px; font-weight:750; letter-spacing:-.015em; text-shadow:0 1px 6px rgba(0,0,0,.75); }
-  h2 { margin:0; font-size:18px; font-weight:700; }
-  .pastilla { display:inline-flex; align-items:center; gap:7px; padding:4px 11px; border-radius:99px; font-size:13px; font-weight:650; white-space:nowrap; box-shadow:inset 0 0 0 99px rgba(9,22,39,.72); }
-  .pastilla::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
+  body { margin:0; min-height:100vh; background:var(--fondo); color:var(--texto); font:15.5px/1.45 "Segoe UI Variable Text","Segoe UI",Roboto,system-ui,-apple-system,sans-serif; }
+  body::before { content:""; position:fixed; inset:0; z-index:-1; background:url(assets/nave.jpg) center 35%/cover no-repeat; opacity:var(--foto); pointer-events:none; }
+  h1 { margin:0; font-size:23px; font-weight:700; letter-spacing:-.012em; }
+  h2 { margin:0; font-size:12.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--suave); }
+  button { font:inherit; color:inherit; }
+  :focus-visible { outline:2px solid var(--turquesa); outline-offset:2px; }
+  .icono { width:20px; height:20px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .num { font-variant-numeric:tabular-nums; }
+  .c-verde { color:var(--verde); } .c-naranja { color:var(--naranja); } .c-rojo { color:var(--rojo); } .c-suave { color:var(--suave); } .c-lora { color:var(--turquesa); }
+
+  /* Estructura: barra inferior en el móvil, menú lateral en el ordenador */
+  .cab { position:sticky; top:0; z-index:1100; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:calc(8px + env(safe-area-inset-top)) 14px 8px; background:var(--panel); border-bottom:1px solid var(--linea); }
+  .logo { display:block; padding:5px 9px; border:0; border-radius:7px; background:#fff; line-height:0; cursor:pointer; }
+  .logo img { height:26px; width:auto; }
+  .marca-texto { display:none; }
+  .nav { position:fixed; left:0; right:0; bottom:0; z-index:1100; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); padding-bottom:env(safe-area-inset-bottom); background:var(--panel); border-top:1px solid var(--linea); }
+  .nav button { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:56px; padding:6px 0 5px; border:0; background:none; color:var(--suave); font-size:10px; font-weight:600; cursor:pointer; }
+  .nav button[aria-current="page"] { color:var(--turquesa); }
+  .nav button[aria-current="page"]::before { content:""; position:absolute; top:-1px; left:22%; right:22%; height:2px; background:var(--turquesa); }
+  .nav .largo { display:none; }
+  .nav .globo { position:absolute; top:4px; left:calc(50% + 5px); min-width:16px; padding:0 4px; border-radius:8px; background:var(--rojo); color:var(--sobre); font-size:10px; font-weight:700; line-height:16px; text-align:center; }
+  .contenido { min-width:0; padding:14px 14px calc(76px + env(safe-area-inset-bottom)); }
+  .vista { animation:entrar .18s ease-out; }
+  @keyframes entrar { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+  /* Paneles */
+  .panel { min-width:0; padding:15px; border:1px solid var(--linea); border-radius:8px; background:var(--panel); }
+  .pila { display:grid; gap:12px; grid-template-columns:minmax(0,1fr); }
+  .titulo { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; margin-bottom:12px; }
+  .titulo-izq { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+  .pagina { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .pista { margin:10px 0 0; color:var(--suave); font-size:13px; }
+  .boton { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:42px; padding:8px 13px; border:1px solid var(--linea); border-radius:7px; background:var(--panel2); color:var(--texto); font-weight:600; font-size:14px; text-decoration:none; cursor:pointer; transition:background .15s; }
+  .boton:hover { background:var(--panel3); }
+  .boton.principal { border-color:var(--turquesa); color:var(--turquesa); background:var(--turquesa-f); }
+  .acciones { display:flex; flex-wrap:wrap; gap:8px; }
+  .pastilla { display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:5px; font-size:11.5px; font-weight:700; letter-spacing:.04em; white-space:nowrap; }
+  .pastilla::before { content:""; width:7px; height:7px; border-radius:50%; background:currentColor; }
   .si { color:var(--verde); background:var(--verde-f); }
+  .si::before { animation:latido 2.4s ease-in-out infinite; }
+  @keyframes latido { 50% { opacity:.35; } }
   .no { color:var(--rojo); background:var(--rojo-f); }
   .ojo { color:var(--naranja); background:var(--naranja-f); }
-  .marca-demo { display:inline-block; padding:3px 9px; border-radius:7px; background:var(--naranja); color:#20160a; font-size:13px; font-weight:800; letter-spacing:.05em; }
-  .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:16px; padding:18px; min-width:0; }
-  .rejilla-inicio { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); }
-  .polis { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); margin-top:14px; }
-  .buscador { margin-bottom:14px; padding:14px 18px; }
-  .buscador label { display:block; font-weight:700; margin-bottom:7px; }
-  .buscador input { width:100%; min-height:46px; padding:9px 13px; border:1px solid var(--borde); border-radius:11px; background:rgba(255,255,255,.09); color:var(--texto); font:inherit; }
-  .buscador input:focus-visible { outline:2px solid var(--azul); outline-offset:1px; }
+  .gris { color:var(--suave); background:var(--panel3); }
+  .lora { color:var(--turquesa); background:var(--turquesa-f); }
+  .marca-demo { display:inline-block; padding:2px 6px; border-radius:4px; background:var(--naranja); color:var(--sobre); font-size:10.5px; font-weight:800; letter-spacing:.06em; vertical-align:1px; }
+  .aviso { margin-bottom:12px; padding:9px 12px; border:1px solid var(--naranja); border-radius:7px; background:var(--naranja-f); font-size:14px; }
+  .aviso-demo { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+  .aviso-demo { flex-wrap:nowrap; padding:5px 6px 5px 10px; font-size:13px; }
+  .aviso-demo .boton { flex:none; min-height:34px; padding:3px 10px; font-size:13px; }
+
+  /* Indicadores */
+  .kpis { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+  .kpi { position:relative; display:block; width:100%; min-width:0; padding:12px 13px; border:1px solid var(--linea); border-left:3px solid var(--tono,var(--linea)); border-radius:8px; background:var(--panel); text-align:left; cursor:pointer; transition:background .15s; }
+  .kpi:hover { background:var(--panel2); }
+  .kpi small { display:flex; align-items:center; gap:6px; color:var(--suave); font-size:12px; font-weight:600; }
+  .kpi small .icono { width:15px; height:15px; color:var(--tono,var(--suave)); }
+  .kpi strong { display:block; margin:5px 0 1px; font-size:27px; font-weight:700; line-height:1.15; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  .kpi strong.medio { font-size:19px; line-height:1.55; }
+  .kpi span { display:block; color:var(--suave); font-size:12.5px; }
+  .kpi.ancho { grid-column:1 / -1; }
+  .t-verde { --tono:var(--verde); } .t-naranja { --tono:var(--naranja); } .t-rojo { --tono:var(--rojo); } .t-lora { --tono:var(--turquesa); } .t-gris { --tono:var(--suave); }
+  .barra-soc { height:5px; margin-top:7px; border-radius:3px; background:var(--panel3); overflow:hidden; }
+  .barra-soc i { display:block; height:100%; background:var(--verde); transition:width .4s; }
+
+  .buscador input { width:100%; min-height:44px; padding:8px 12px; border:1px solid var(--linea); border-radius:7px; background:var(--panel2); color:var(--texto); font:inherit; }
   .buscador input::placeholder { color:var(--suave); }
-  .buscador p { margin:9px 0 0; color:var(--suave); font-size:14px; }
-  .titulo-pagina { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; }
-  .titulo-izq { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-width:0; }
-  .boton { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:9px 15px; border-radius:11px; border:1px solid var(--borde); background:rgba(24,41,62,.94); color:var(--texto); font:inherit; font-weight:650; font-size:15px; text-decoration:none; cursor:pointer; }
-  .boton:hover { background:rgba(44,64,88,.96); }
-  .boton:focus-visible, .baldosa:focus-visible, .alarma:focus-visible, summary:focus-visible { outline:2px solid var(--azul); outline-offset:2px; }
-  .boton.principal { background:var(--naranja); border-color:var(--naranja); color:#20160a; }
-  .boton.principal:hover { background:#ffc35c; }
-  .aviso { color:var(--naranja); background:rgba(43,32,12,.93); border-radius:11px; padding:10px 13px; font-size:14px; margin-bottom:14px; }
-  .panel-demo p { margin:10px 0 14px; color:var(--suave); font-size:15px; }
-  .cuentas { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:14px; }
-  .cuenta { background:var(--tarjeta2); border-radius:11px; padding:9px 6px; text-align:center; }
-  .cuenta strong { display:block; font-size:24px; line-height:1.15; font-variant-numeric:tabular-nums; }
-  .cuenta small { color:var(--suave); font-size:12.5px; }
-  .pila { display:grid; gap:14px; grid-template-columns:minmax(0,1fr); }
-  details > summary { display:flex; align-items:center; justify-content:space-between; gap:10px; cursor:pointer; list-style:none; font-size:18px; font-weight:700; border-radius:8px; }
-  details > summary::-webkit-details-marker { display:none; }
-  details > summary::after { content:"▾"; color:var(--suave); font-size:14px; }
-  details[open] > summary::after { content:"▴"; }
-  .filas { margin-top:10px; border-top:1px solid var(--borde); }
-  .fila { display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:42px; padding:7px 0; border-bottom:1px solid var(--borde); }
+  .buscador label { display:block; margin-bottom:6px; font-size:12.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--suave); }
+  .buscador p { margin:8px 0 0; color:var(--suave); font-size:14px; }
+  .segmento { display:inline-flex; flex-wrap:wrap; gap:2px; padding:3px; border-radius:7px; background:var(--panel2); }
+  .segmento button { min-height:36px; padding:5px 9px; border:0; border-radius:5px; background:none; color:var(--suave); font-size:13px; font-weight:600; cursor:pointer; }
+  .segmento button[aria-pressed="true"] { background:var(--texto); color:var(--fondo); }
+  select { min-height:42px; max-width:100%; padding:7px 10px; border:1px solid var(--linea); border-radius:7px; background:var(--panel2); color:var(--texto); font:inherit; }
+
+  /* Listas y tablas */
+  .filas { border-top:1px solid var(--linea); }
+  .fila { display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:40px; padding:7px 0; border-bottom:1px solid var(--linea); }
   .fila:last-child { border-bottom:0; padding-bottom:0; }
-  .fila b { color:var(--suave); font-weight:550; font-size:14px; flex:none; max-width:55%; }
-  .fila span { text-align:right; overflow-wrap:anywhere; font-weight:600; font-size:15px; }
-  .c-verde { color:var(--verde); } .c-naranja { color:var(--naranja); } .c-rojo { color:var(--rojo); } .c-suave { color:var(--suave); }
-  .rayas { display:inline-flex; align-items:flex-end; gap:3px; height:18px; vertical-align:-3px; margin-left:8px; }
-  .rayas i { width:5px; background:var(--borde); border-radius:1px; }
-  .rayas i.on { background:var(--verde); }
-  .rayas i:nth-child(1){height:5px}.rayas i:nth-child(2){height:9px}.rayas i:nth-child(3){height:13px}.rayas i:nth-child(4){height:18px}
-  .mapa { width:100%; height:62vh; min-height:340px; border-radius:13px; overflow:hidden; background:#16283d; color:#20262e; }
-  .mapa.bajo { height:320px; min-height:0; }
-  .nave-resumen { box-sizing:border-box; text-align:center; border:2px solid #fff; border-radius:50%; color:#0c1b2e; font:700 14px/30px system-ui, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,.45); }
-  .nave-resumen.nv0 { background:#43d17f; } .nave-resumen.nv1 { background:#f7b23b; } .nave-resumen.nv2 { background:#ff6b6b; }
-  .sin-mapa { display:flex; align-items:center; justify-content:center; height:100%; padding:20px; color:var(--suave); text-align:center; }
-  .barra-mapa { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
-  .alarmas { display:grid; gap:7px; margin-top:12px; }
-  .alarma { display:flex; align-items:center; gap:10px; width:100%; min-height:46px; padding:8px 12px; border:0; border-radius:11px; color:var(--texto); font:inherit; font-size:14.5px; text-align:left; cursor:pointer; }
-  .alarma.n2 { background:rgba(74,24,28,.95); }
-  .alarma.n1 { background:rgba(62,46,14,.95); }
+  .fila b { flex:none; max-width:55%; color:var(--suave); font-weight:500; font-size:13.5px; }
+  .fila span.val { text-align:right; overflow-wrap:anywhere; font-weight:600; font-size:14.5px; font-variant-numeric:tabular-nums; }
+  .rayas { display:inline-flex; align-items:flex-end; gap:2px; height:15px; vertical-align:-2px; margin-left:7px; }
+  .rayas i { width:4px; background:var(--panel3); border-radius:1px; }
+  .rayas i.on { background:var(--turquesa); }
+  .rayas i:nth-child(1){height:4px}.rayas i:nth-child(2){height:7px}.rayas i:nth-child(3){height:11px}.rayas i:nth-child(4){height:15px}
+  .alarmas { display:grid; gap:6px; }
+  .alarma { display:flex; align-items:center; gap:10px; width:100%; min-height:44px; padding:7px 11px; border:0; border-left:3px solid; border-radius:6px; font-size:14px; text-align:left; cursor:pointer; }
+  .alarma.n2 { border-color:var(--rojo); background:var(--rojo-f); }
+  .alarma.n1 { border-color:var(--naranja); background:var(--naranja-f); }
+  .alarma.fija { cursor:default; }
+  .alarma .icono { width:18px; height:18px; }
+  .alarma.n2 .icono { color:var(--rojo); } .alarma.n1 .icono { color:var(--naranja); }
   .alarma b { flex:none; }
-  .n2 > b { color:var(--rojo); } .n1 > b { color:var(--naranja); }
-  .baldosas { display:grid; grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:8px; margin-top:12px; }
-  .baldosa { display:block; padding:9px 10px; border:1px solid var(--borde); border-left:5px solid var(--verde); border-radius:10px; background:var(--tarjeta2); color:inherit; font:inherit; text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; }
-  .baldosa:hover { background:rgba(255,255,255,.13); }
+  .alarma small { display:block; color:var(--suave); font-size:12.5px; }
+  .tabla-marco { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums; }
+  th { padding:6px 9px; border-bottom:1px solid var(--linea); color:var(--suave); font-size:11.5px; font-weight:700; letter-spacing:.05em; text-align:left; text-transform:uppercase; white-space:nowrap; }
+  td { padding:8px 9px; border-bottom:1px solid var(--linea); white-space:nowrap; }
+  tr:last-child td { border-bottom:0; }
+  td.partir { white-space:normal; min-width:150px; }
+  tr[data-ficha] { cursor:pointer; }
+  tr[data-ficha]:hover td { background:var(--panel2); }
+  .vacio { padding:18px 8px; color:var(--suave); text-align:center; font-size:14px; }
+  .zona-fila { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:44px; padding:7px 0; border:0; border-bottom:1px solid var(--linea); background:none; text-align:left; cursor:pointer; }
+  .zona-fila:last-child { border-bottom:0; }
+  .zona-fila b { font-weight:600; font-size:14.5px; }
+
+  /* Baterías */
+  .baldosas { display:grid; grid-template-columns:repeat(auto-fill,minmax(136px,1fr)); gap:8px; }
+  .baldosa { display:block; width:100%; padding:9px 10px; border:1px solid var(--linea); border-left:3px solid var(--verde); border-radius:7px; background:var(--panel2); text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; transition:background .15s; }
+  .baldosa:hover { background:var(--panel3); }
   .baldosa strong { display:block; font-size:15px; }
-  .baldosa span { display:block; font-size:13px; color:var(--suave); }
-  .baldosa.n1 { border-left-color:var(--naranja); background:var(--naranja-f); }
-  .baldosa.n2 { border-left-color:var(--rojo); background:var(--rojo-f); }
-  .baldosa em { display:block; font-style:normal; font-size:12.5px; font-weight:700; }
-  .baldosa.apagada { border-left-color:var(--rojo); }
-  .baldosa.n0 em { color:var(--verde); } .baldosa.n1 em { color:var(--naranja); } .baldosa.n2 em, .baldosa.apagada em { color:var(--rojo); }
-  .celdas { display:grid; grid-template-columns:repeat(auto-fill,minmax(68px,1fr)); gap:6px; margin-top:10px; }
-  .segmento { display:inline-flex; gap:3px; padding:3px; border-radius:11px; background:var(--tarjeta2); }
-  .segmento button { min-height:38px; padding:6px 12px; border:0; border-radius:8px; background:none; color:var(--suave); font:inherit; font-size:14px; font-weight:650; cursor:pointer; }
-  .segmento button[aria-pressed="true"] { background:var(--texto); color:#0b1c30; }
-  .segmento button:focus-visible, .celda:focus-visible, #graf-svg:focus-visible { outline:2px solid var(--azul); outline-offset:2px; }
-  .leyenda { display:flex; flex-wrap:wrap; gap:6px 16px; color:var(--suave); font-size:13px; margin-bottom:8px; }
+  .baldosa span { display:block; color:var(--suave); font-size:12.5px; }
+  .baldosa em { display:block; margin-top:2px; font-style:normal; font-size:11.5px; font-weight:700; letter-spacing:.03em; }
+  .baldosa.n0 em { color:var(--verde); }
+  .baldosa.n1 { border-left-color:var(--naranja); background:var(--naranja-f); } .baldosa.n1 em { color:var(--naranja); }
+  .baldosa.n2 { border-left-color:var(--rojo); background:var(--rojo-f); } .baldosa.n2 em { color:var(--rojo); }
+  .baldosa.apagada { border-left-color:var(--rojo); } .baldosa.apagada em { color:var(--rojo); }
+  .baldosa.sin { border-left-color:var(--suave); } .baldosa.sin em { color:var(--suave); }
+
+  /* Ficha */
+  .medidas { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; border:1px solid var(--linea); border-radius:7px; background:var(--linea); overflow:hidden; }
+  .medida { min-width:0; padding:10px 11px; background:var(--panel); }
+  .medida small { display:block; color:var(--suave); font-size:11.5px; font-weight:600; }
+  .medida b { display:block; margin-top:2px; font-size:16.5px; font-weight:650; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+  .medida b.no-disp { color:var(--suave); font-size:13.5px; font-weight:500; }
+  .medida span { display:block; color:var(--suave); font-size:12px; }
+  .resumen-celdas { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+  .resumen-celdas div { padding:8px 10px; border-radius:6px; background:var(--panel2); }
+  .resumen-celdas small { display:block; color:var(--suave); font-size:11.5px; font-weight:600; }
+  .resumen-celdas b { font-size:15.5px; font-variant-numeric:tabular-nums; }
+  .celdas { display:grid; grid-template-columns:repeat(auto-fill,minmax(66px,1fr)); gap:5px; margin-top:12px; }
+  .celda { position:relative; display:block; width:100%; padding:6px 7px 8px; border:0; border-radius:5px; background:var(--panel2); text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; overflow:hidden; }
+  .celda.elegida { box-shadow:inset 0 0 0 2px var(--serie); }
+  .celda small { display:block; color:var(--suave); font-size:11px; }
+  .celda span { font-weight:650; font-size:13.5px; }
+  .celda i { position:absolute; left:0; bottom:0; height:3px; background:var(--verde); transition:width .4s; }
+  .celda.n1 { background:var(--naranja-f); } .celda.n1 span { color:var(--naranja); } .celda.n1 i { background:var(--naranja); }
+  .celda.n2 { background:var(--rojo-f); } .celda.n2 span { color:var(--rojo); } .celda.n2 i { background:var(--rojo); }
+  .celda em { position:absolute; bottom:8px; right:6px; color:var(--suave); font-style:normal; font-size:10px; font-weight:700; }
+
+  /* Gráficas */
+  .leyenda { display:flex; flex-wrap:wrap; gap:5px 14px; margin-bottom:6px; color:var(--suave); font-size:12.5px; }
   .leyenda span { display:inline-flex; align-items:center; gap:6px; }
-  .leyenda i { display:inline-block; width:16px; height:2px; background:#3d97e6; border-radius:2px; }
-  .leyenda i.banda { height:10px; background:rgba(179,193,208,.28); }
+  .leyenda i { display:inline-block; width:16px; height:2px; background:var(--serie); border-radius:2px; }
+  .leyenda i.banda { height:10px; background:var(--banda); }
   .grafica { position:relative; }
-  #graf-svg { display:block; width:100%; height:260px; touch-action:pan-y; border-radius:6px; }
-  #graf-svg text { fill:var(--suave); font-size:12px; font-variant-numeric:tabular-nums; }
-  #graf-svg text.fin { fill:var(--texto); font-weight:650; }
-  .graf-tip { position:absolute; top:6px; min-width:150px; padding:8px 10px; border:1px solid var(--borde); border-radius:9px; background:#0a1727; font-size:13px; pointer-events:none; font-variant-numeric:tabular-nums; }
+  .grafica svg { display:block; width:100%; height:220px; touch-action:pan-y; border-radius:4px; }
+  .grafica text { fill:var(--suave); font-size:11.5px; font-variant-numeric:tabular-nums; }
+  .grafica text.fin { fill:var(--texto); font-weight:650; }
+  .g-rejilla { stroke:var(--rejilla); }
+  .g-linea { fill:none; stroke:var(--serie); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+  .g-punto { fill:var(--serie); stroke:var(--panel); stroke-width:2; }
+  .lora-g .g-linea { stroke:var(--turquesa); } .lora-g .g-punto { fill:var(--turquesa); }
+  .g-banda { fill:var(--banda); }
+  .g-cruz { stroke:var(--suave); }
+  .g-barra { fill:var(--rojo); }
+  .u-naranja { stroke:var(--naranja); } .u-rojo { stroke:var(--rojo); }
+  .graf-tip { position:absolute; top:6px; min-width:138px; padding:7px 9px; border:1px solid var(--linea); border-radius:6px; background:var(--panel2); font-size:12.5px; pointer-events:none; font-variant-numeric:tabular-nums; }
   .graf-tip div { display:flex; align-items:center; gap:7px; }
-  .graf-tip small { color:var(--suave); font-size:12.5px; }
-  .graf-tip i { flex:none; width:12px; height:2px; background:#3d97e6; }
-  .graf-tip i.banda { background:#b3c1d0; }
-  .pista { margin:12px 0 0; color:var(--suave); font-size:13px; }
-  .tabla-graf { margin-top:14px; }
-  .tabla-graf > summary { font-size:14px; font-weight:650; color:var(--suave); }
-  .tabla-graf .marco-tabla { max-height:260px; overflow:auto; margin-top:8px; }
-  .tabla-graf table { width:100%; border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
-  .tabla-graf th, .tabla-graf td { padding:5px 8px; border-bottom:1px solid var(--borde); text-align:right; white-space:nowrap; }
-  .tabla-graf th:first-child, .tabla-graf td:first-child { text-align:left; }
-  .celda { display:block; width:100%; padding:6px 7px; border:0; border-radius:8px; background:var(--tarjeta2); color:inherit; font:inherit; text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; }
-  .celda.elegida { box-shadow:inset 0 0 0 2px #3d97e6; }
-  .celda small { display:block; color:var(--suave); font-size:11.5px; }
-  .celda span { font-weight:650; font-size:14px; }
-  .celda.n1 { background:var(--naranja-f); } .celda.n1 span { color:var(--naranja); }
-  .celda.n2 { background:var(--rojo-f); } .celda.n2 span { color:var(--rojo); }
-  .acciones { display:flex; flex-wrap:wrap; gap:8px; }
-  @media (min-width:900px) {
-    .rejilla-inicio { grid-template-columns:minmax(0,1fr) 340px; }
-    .polis { grid-template-columns:repeat(2,minmax(0,1fr)); }
-    .polis .todo-ancho { grid-column:1 / -1; }
-    .dos-col { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; align-items:start; }
-    .marco { padding-top:20px; }
+  .graf-tip small { color:var(--suave); font-size:12px; }
+  .graf-tip i { flex:none; width:12px; height:2px; background:var(--serie); }
+  .graf-tip i.banda { background:var(--suave); }
+  .graf-vacio { margin:0; padding:26px 10px; color:var(--suave); text-align:center; font-size:14px; }
+  .tabla-graf { margin-top:8px; }
+  .tabla-graf > summary { color:var(--suave); font-size:13px; font-weight:600; cursor:pointer; }
+  .tabla-graf .marco-tabla { max-height:240px; overflow:auto; margin-top:6px; }
+  .tabla-graf td, .tabla-graf th { padding:4px 8px; text-align:right; }
+  .tabla-graf td:first-child, .tabla-graf th:first-child { text-align:left; }
+
+  /* Mapa */
+  .mapa { width:100%; height:66vh; height:66svh; min-height:320px; border-radius:6px; overflow:hidden; background:var(--panel2); color:#20262e; }
+  .sin-mapa { display:flex; align-items:center; justify-content:center; height:100%; padding:20px; color:var(--suave); text-align:center; }
+  .nave-resumen { text-align:center; border:2px solid #fff; border-radius:50%; color:#07131f; font:700 14px/30px system-ui,sans-serif; box-shadow:0 1px 4px rgba(0,0,0,.45); }
+  .nave-resumen.nv0 { background:#3ddc84; } .nave-resumen.nv1 { background:#ffa62b; } .nave-resumen.nv2 { background:#ff6468; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background:var(--panel2); color:var(--texto); }
+  .leaflet-popup-content { margin:11px 13px; font:13.5px/1.45 "Segoe UI",Roboto,system-ui,sans-serif; min-width:170px; }
+  .leaflet-popup-content b { font-size:15px; }
+  .leaflet-popup-content .boton { width:100%; margin-top:8px; min-height:38px; }
+  .barra-mapa { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; }
+
+  /* Ajustes */
+  .interruptor { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:48px; width:100%; padding:7px 0; border:0; background:none; text-align:left; cursor:pointer; }
+  .interruptor i { position:relative; flex:none; width:44px; height:24px; border-radius:12px; background:var(--panel3); transition:background .15s; }
+  .interruptor i::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--suave); transition:transform .15s; }
+  .interruptor[aria-checked="true"] i { background:var(--naranja); }
+  .interruptor[aria-checked="true"] i::after { transform:translateX(20px); background:var(--sobre); }
+  .interruptor small { display:block; color:var(--suave); font-size:13px; font-weight:400; }
+
+  @media (min-width:600px) {
+    .kpis { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .medidas { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .resumen-celdas { grid-template-columns:repeat(4,minmax(0,1fr)); }
   }
-  @media (max-width:420px) { .producto { display:none; } .logo img { height:30px; } }
+  @media (min-width:900px) {
+    body { display:grid; grid-template-columns:216px minmax(0,1fr); grid-template-rows:auto 1fr; }
+    .cab { position:sticky; top:0; grid-column:1; grid-row:1; flex-direction:column; align-items:flex-start; padding:16px 14px 12px; border-right:1px solid var(--linea); border-bottom:0; z-index:1; }
+    .logo img { height:32px; }
+    .marca-texto { display:block; color:var(--suave); font-size:12px; font-weight:600; letter-spacing:.04em; }
+    .nav { position:sticky; top:118px; grid-column:1; grid-row:2; align-self:stretch; display:flex; flex-direction:column; gap:2px; height:calc(100vh - 118px); padding:6px 8px; border-top:0; border-right:1px solid var(--linea); z-index:1; }
+    .nav button { flex-direction:row; justify-content:flex-start; gap:11px; min-height:42px; padding:0 10px; border-radius:6px; font-size:14px; }
+    .nav button:hover { background:var(--panel2); }
+    .nav button[aria-current="page"] { background:var(--turquesa-f); }
+    .nav button[aria-current="page"]::before { top:8px; bottom:8px; left:0; right:auto; width:2px; height:auto; }
+    .nav .largo { display:inline; } .nav .corto { display:none; }
+    .nav .globo { position:static; margin-left:auto; }
+    .contenido { grid-column:2; grid-row:1 / 3; padding:20px 24px 32px; }
+    .marco { max-width:1280px; margin:0 auto; }
+    .dos-col { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; align-items:start; }
+    .kpi.ancho { grid-column:span 2; }
+    .graficas { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:start; }
+    .medidas { grid-template-columns:repeat(5,minmax(0,1fr)); }
+  }
+  @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none !important; transition:none !important; } }
 </style>
 </head>
 <body>
-<div class="marco">
-  <header>
-    <button id="ir-inicio" class="logo" type="button" aria-label="Ir al inicio" style="border:0;cursor:pointer"><img src="assets/logo.png" alt="Endurance"></button>
-    <div class="cab-der"><span class="producto">Monitor de baterías</span><span id="red" class="pastilla no">Sin enlace</span></div>
-  </header>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-inicio" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="10" rx="1.5"/><rect x="13" y="3" width="8" height="6" rx="1.5"/><rect x="13" y="11" width="8" height="10" rx="1.5"/><rect x="3" y="15" width="8" height="6" rx="1.5"/></symbol>
+  <symbol id="i-mapa" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-baterias" viewBox="0 0 24 24"><rect x="2.5" y="7" width="17" height="10" rx="2"/><path d="M22 10.5v3M6 10.5v3M10 10.5v3"/></symbol>
+  <symbol id="i-comunicaciones" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M8 8a5.7 5.7 0 0 0 0 8M16 8a5.7 5.7 0 0 1 0 8M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14"/></symbol>
+  <symbol id="i-graficas" viewBox="0 0 24 24"><path d="M3.5 3.5v17h17"/><path d="m7.5 15 4-5 3.5 3 4.5-6.5"/></symbol>
+  <symbol id="i-alarmas" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 6.5-2.5 8-2.5 8h17S18 15.500 18 9Z"/><path d="M10 20.500a2.200 2.200 0 0 0 4 0"/></symbol>
+  <symbol id="i-ajustes" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="i-aviso" viewBox="0 0 24 24"><path d="M12 4 2.700 20h18.600L12 4Z"/><path d="M12 10v4.500M12 17.500v.1"/></symbol>
+  <symbol id="i-reloj" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><path d="m8.500 12 2.500 2.500 4.500-5"/></symbol>
+  <symbol id="i-corte" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
+  <symbol id="i-volver" viewBox="0 0 24 24"><path d="m14.500 5.500-6.500 6.500 6.500 6.500"/></symbol>
+</svg>
 
-  <main id="v-inicio">
-    <div id="aviso" class="aviso" hidden></div>
-    <section class="tarjeta buscador">
+<header class="cab">
+  <button id="ir-inicio" class="logo" type="button" aria-label="Ir al inicio"><img src="assets/logo.png" alt="Endurance"></button>
+  <span class="marca-texto">Control de flota LoRa</span>
+  <span id="red" class="pastilla gris">Sin enlace</span>
+</header>
+
+<nav class="nav" id="nav" aria-label="Secciones"></nav>
+
+<div class="contenido"><div class="marco">
+  <div id="aviso" class="aviso" hidden></div>
+  <div id="aviso-demo" class="aviso aviso-demo" hidden><span><span class="marca-demo">DEMO</span> Hay datos simulados en pantalla</span><button class="boton" type="button" data-demo-cambiar>Desactivar</button></div>
+
+  <main id="v-inicio" class="vista">
+    <div class="pagina"><h1>Panel de control</h1></div>
+    <div class="kpis" id="ini-kpis"></div>
+    <section class="panel buscador" style="margin-bottom:12px">
+      <label for="buscar-ini">Buscar batería</label>
+      <input id="buscar-ini" type="search" placeholder="Ejemplo: B 01, Canet o Batería 1" autocomplete="off" enterkeyhint="search">
+    </section>
+    <div class="pila dos-col">
+      <section class="panel"><div class="titulo"><h2>Alarmas activas</h2><button class="boton" type="button" data-ir="alarmas">Ver todas</button></div><div id="ini-alarmas" aria-live="polite"></div></section>
+      <div class="pila">
+        <section class="panel"><div class="titulo"><h2>Flota por zona</h2></div><div id="ini-zonas"></div></section>
+        <section class="panel" id="ini-demo"></section>
+      </div>
+    </div>
+  </main>
+
+  <main id="v-mapa" class="vista" hidden>
+    <div class="pagina"><h1>Mapa de dispositivos</h1><div class="segmento" role="group" aria-label="Filtrar dispositivos" id="mapa-filtros"></div></div>
+    <section class="panel">
+      <div id="mapa" class="mapa"></div>
+      <div id="mapa-elegido"></div>
+      <div id="mapa-sinpos"></div>
+    </section>
+  </main>
+
+  <main id="v-baterias" class="vista" hidden>
+    <div class="pagina"><h1>Baterías</h1><div class="segmento" role="group" aria-label="Filtrar baterías" id="bat-filtros"></div></div>
+    <section class="panel buscador" style="margin-bottom:12px">
       <label for="buscar">Buscar batería</label>
-      <input id="buscar" type="search" placeholder="Ejemplo: D 17, Canet o Batería 1" autocomplete="off" enterkeyhint="search">
+      <input id="buscar" type="search" placeholder="Ejemplo: B 01, Canet o Batería 1" autocomplete="off" enterkeyhint="search">
       <p id="buscar-res" aria-live="polite" hidden></p>
     </section>
-    <div id="bloque-general" class="rejilla-inicio">
-      <section class="tarjeta" aria-labelledby="t-mapa">
-        <div class="titulo-izq" style="margin-bottom:12px"><h2 id="t-mapa">Mapa</h2><span class="c-suave" style="font-size:14px">Azul: reales · Número: baterías de cada nave, tócalo para verlas</span></div>
-        <div id="mapa-parque" class="mapa bajo"></div>
-      </section>
-      <div class="pila" style="align-content:start">
-        <aside class="tarjeta panel-demo" aria-labelledby="t-demo">
-          <div class="titulo-izq"><span class="marca-demo">DEMO</span><h2 id="t-demo">Baterías simuladas</h2></div>
-          <p>Datos, ubicaciones y umbrales de alarma inventados. Nada se guarda en la base de datos.</p>
-          <div class="cuentas" id="cuentas-inicio"></div>
-          <div class="acciones"><button class="boton" type="button" id="demo-fallo">Simular bajada de celda</button><button class="boton" type="button" id="demo-reset">Reiniciar</button></div>
-        </aside>
-        <section class="tarjeta" aria-labelledby="t-alarmas">
-          <div class="titulo-izq"><span class="marca-demo">DEMO</span><h2 id="t-alarmas">Alarmas activas</h2><span id="n-alarmas"></span></div>
-          <div class="alarmas" id="lista-alarmas" aria-live="polite"></div>
-        </section>
-      </div>
-    </div>
-    <div class="polis">
-      <section class="tarjeta" id="pol-A"></section>
-      <section class="tarjeta" id="pol-B"></section>
-      <section class="tarjeta todo-ancho" id="pol-C"></section>
-      <section class="tarjeta todo-ancho" id="pol-D"></section>
-    </div>
+    <div class="pila" id="bat-grupos"></div>
   </main>
 
-  <main id="v-bateria" hidden>
-    <div class="titulo-pagina">
-      <div class="titulo-izq"><button class="boton" type="button" data-volver>‹ Volver</button><h1 id="bat-titulo"></h1><span id="bat-estado"></span></div>
-      <button class="boton principal" type="button" id="bat-gps">GPS · Ver en el mapa</button>
-    </div>
-    <div class="pila dos-col">
-      <details class="tarjeta" open><summary>Ajustes</summary><div class="filas" id="bat-ajustes"></div></details>
-      <details class="tarjeta" open><summary>Datos del BMS <span class="pastilla no" style="margin-left:auto">NO CONECTADO</span></summary><div id="bat-bms"></div></details>
-    </div>
-    <section class="tarjeta" style="margin-top:14px"><h2>Tensión por celda</h2><p class="pista">Sin datos: el BMS no está conectado.</p></section>
-  </main>
-
-  <main id="v-mapa" hidden>
-    <div class="titulo-pagina">
-      <div class="titulo-izq"><button class="boton" type="button" data-volver>‹ Volver</button><span id="mapa-demo" class="marca-demo" hidden>DEMO</span><h1 id="mapa-titulo"></h1></div>
-    </div>
-    <section class="tarjeta">
-      <div id="mapa-vacio" class="aviso" hidden style="margin:0"></div>
-      <div id="mapa-pos" class="mapa"></div>
-      <div class="barra-mapa"><span id="mapa-nota" class="producto"></span><a id="mapa-google" class="boton" target="_blank" rel="noopener">Abrir en Google Maps</a></div>
-    </section>
-  </main>
-
-  <main id="v-pack" hidden>
-    <div class="titulo-pagina">
-      <div class="titulo-izq"><button class="boton" type="button" data-volver>‹ Volver</button><span class="marca-demo">DEMO</span><h1 id="pack-titulo"></h1><span id="pack-estado"></span></div>
-      <button class="boton principal" type="button" id="pack-gps">GPS · Ver en el mapa</button>
+  <main id="v-ficha" class="vista" hidden>
+    <div class="pagina">
+      <div class="titulo-izq"><button class="boton" type="button" data-volver aria-label="Volver"><svg class="icono"><use href="#i-volver"/></svg></button><h1 id="fi-titulo"></h1><span id="fi-marca"></span><span id="fi-estado"></span></div>
+      <button class="boton principal" type="button" id="fi-gps"><svg class="icono"><use href="#i-mapa"/></svg>GPS · Ver en el mapa</button>
     </div>
     <div class="pila">
-      <div class="alarmas" id="pack-alarmas" style="margin:0"></div>
+      <div class="alarmas" id="fi-alarmas"></div>
+      <section class="panel"><div class="titulo"><h2>Estado</h2></div><div class="medidas" id="fi-medidas"></div></section>
       <div class="pila dos-col">
-        <details class="tarjeta" open><summary>Ajustes</summary><div class="filas" id="pack-ajustes"></div></details>
-        <details class="tarjeta" open><summary>Datos del BMS</summary><div id="pack-bms"></div></details>
+        <section class="panel"><div class="titulo"><h2>Ajustes</h2></div><div class="filas" id="fi-ajustes"></div></section>
+        <section class="panel"><div class="titulo"><h2>Datos del BMS</h2><span id="fi-bms-estado"></span></div><div class="filas" id="fi-bms"></div></section>
       </div>
-      <section class="tarjeta" aria-labelledby="t-graf">
-        <div class="titulo-pagina" style="margin-bottom:10px"><h2 id="t-graf">Tensión por celda</h2><div class="segmento" role="group" aria-label="Periodo de la gráfica" id="graf-rangos"></div></div>
-        <div class="leyenda" id="graf-leyenda"></div>
-        <div class="grafica"><svg id="graf-svg" role="img" tabindex="0"></svg><div id="graf-tip" class="graf-tip" hidden></div></div>
-        <p class="pista">Pulsa una celda para ver su línea en la gráfica.</p>
-        <div class="celdas" id="pack-celdas"></div>
-        <details class="tabla-graf" id="graf-detalles"><summary>Ver los datos en tabla</summary><div class="marco-tabla" id="graf-tabla"></div></details>
+      <section class="panel" aria-labelledby="t-celdas">
+        <div class="titulo"><h2 id="t-celdas">Tensión por celda</h2><div class="segmento" role="group" aria-label="Periodo de la gráfica" id="fi-rangos"></div></div>
+        <div id="fi-sin-celdas" class="vacio" hidden>Sin datos: el BMS no está conectado.</div>
+        <div id="fi-con-celdas">
+          <div class="resumen-celdas" id="fi-resumen"></div>
+          <div class="leyenda" id="fi-leyenda"></div>
+          <div id="fi-grafica"></div>
+          <p class="pista">Pulsa una celda para ver su línea en la gráfica.</p>
+          <div class="celdas" id="fi-celdas"></div>
+        </div>
       </section>
     </div>
   </main>
-</div>
+
+  <main id="v-comunicaciones" class="vista" hidden>
+    <div class="pagina"><h1>Comunicaciones LoRa</h1></div>
+    <div class="kpis" id="com-kpis"></div>
+    <div class="pila">
+      <section class="panel"><div class="titulo"><h2>Dispositivos emisores</h2></div><div class="tabla-marco" id="com-emisores"></div></section>
+      <section class="panel"><div class="titulo"><h2>Estaciones receptoras</h2></div><div class="tabla-marco" id="com-estaciones"></div><p class="pista">Cada placa escucha a la otra por LoRa y sube los datos a internet si tiene Wi-Fi.</p></section>
+      <section class="panel"><div class="titulo"><h2>Historial de paquetes</h2></div><div class="tabla-marco" id="com-paquetes"></div><p class="pista">Se guarda en este dispositivo mientras la aplicación está abierta. SNR: las placas todavía no lo envían.</p></section>
+    </div>
+  </main>
+
+  <main id="v-graficas" class="vista" hidden>
+    <div class="pagina"><h1>Gráficas</h1><div class="acciones"><select id="gr-disp" aria-label="Dispositivo"></select><div class="segmento" role="group" aria-label="Periodo" id="gr-rangos"></div></div></div>
+    <p id="gr-nota" class="pista" style="margin:0 0 12px"></p>
+    <div class="pila graficas" id="gr-caja"></div>
+  </main>
+
+  <main id="v-alarmas" class="vista" hidden>
+    <div class="pagina"><h1>Centro de alarmas</h1><div class="segmento" role="group" aria-label="Ver" id="al-modos"></div></div>
+    <div class="kpis" id="al-kpis"></div>
+    <section class="panel"><div id="al-lista" aria-live="polite"></div></section>
+  </main>
+
+  <main id="v-ajustes" class="vista" hidden>
+    <div class="pagina"><h1>Ajustes</h1></div>
+    <div class="pila dos-col">
+      <div class="pila">
+        <section class="panel"><div class="titulo"><h2>Ajustes de cada batería</h2></div><div id="aj-baterias"></div><p class="pista">Wi-Fi, enlace LoRa, posicionamiento y alimentación están en la ficha de cada batería.</p></section>
+        <section class="panel"><div class="titulo"><h2>Enlace de datos</h2></div><div class="filas" id="aj-enlace"></div></section>
+        <section class="panel"><div class="titulo"><h2>Datos guardados aquí</h2></div><div class="filas" id="aj-datos"></div><div class="acciones" style="margin-top:12px"><button class="boton" type="button" id="aj-borrar">Borrar histórico de este dispositivo</button></div></section>
+      </div>
+      <div class="pila">
+        <section class="panel"><div class="titulo"><h2>Modo DEMO</h2></div>
+          <button class="interruptor" type="button" role="switch" id="aj-demo"><span><b>Baterías simuladas</b><small>Añade polígonos de ejemplo con alarmas. Nunca se escribe nada en la base de datos.</small></span><i></i></button>
+          <div class="acciones" id="aj-demo-acciones" style="margin-top:8px"></div>
+        </section>
+        <section class="panel"><div class="titulo"><h2>Aspecto</h2><div class="segmento" role="group" aria-label="Tema" id="aj-tema"></div></div></section>
+        <section class="panel"><div class="titulo"><h2>Umbrales de alarma</h2></div><div class="filas" id="aj-umbrales"></div><p class="pista">Son valores de ejemplo: hay que confirmarlos con los datos de tus baterías.</p></section>
+      </div>
+    </div>
+  </main>
+</div></div>
+
 <script>
   // Solo lectura: esta página no escribe nada en la base de datos
   const BASE = 'https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app/v/';
-  const CONECTADO_MS = 35000, CADA_MS = 2000, CADA_DEMO_MS = 1000, REPASO_VUELTAS = 5;   // las placas suben datos cada 20 s
+  const CONECTADO_MS = 35000, PERDIDA_MS = 600000, CADA_MS = 2000, CADA_DEMO_MS = 1000, REPASO_VUELTAS = 5;   // las placas suben datos cada 20 s
   const CLAVE = location.hash.slice(1);   // la clave va tras el # y nunca llega al servidor de la página
+  const HAY_CLAVE = CLAVE.length >= 24;
   const $ = id => document.getElementById(id);
-  let ultimo = null, vista = 'inicio', actual = null;
+  let ultimo = null, vista = 'inicio', actual = null, FL = [];
 
   const escapar = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
   const numero = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const opcional = v => { if (v === undefined || v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
   const decimal = (n, d) => n.toFixed(d).replace('.', ',');
   const conectado = d => !!d && !!d.hora && Date.now() - d.hora + d.edad_s * 1000 < CONECTADO_MS;
-  const fila = (t, v) => '<div class="fila"><b>' + t + '</b><span>' + v + '</span></div>';
+  const fila = (t, v) => '<div class="fila"><b>' + t + '</b><span class="val">' + v + '</span></div>';
   const suave = t => '<span class="c-suave">' + t + '</span>';
-  const pastilla = ok => '<span class="pastilla ' + (ok ? 'si' : 'no') + '">' + (ok ? 'CONECTADO' : 'NO CONECTADO') + '</span>';
+  const marcaDemo = '<span class="marca-demo">DEMO</span>';
+  const icono = n => '<svg class="icono" aria-hidden="true"><use href="#i-' + n + '"/></svg>';
   const rayas = n => '<span class="rayas" aria-label="Cobertura ' + n + ' de 4">' + [0, 1, 2, 3].map(i => '<i class="' + (i < n ? 'on' : '') + '"></i>').join('') + '</span>';
   const rayasLora = r => r > -90 ? 4 : r > -100 ? 3 : r > -110 ? 2 : 1;
   const rayasWifi = r => r > -55 ? 4 : r > -65 ? 3 : r > -75 ? 2 : r > -85 ? 1 : 0;
@@ -245,66 +391,263 @@
     if (s < 86400) return 'hace ' + Math.round(s / 3600) + ' h';
     return 'hace ' + Math.round(s / 86400) + ' d';
   }
-  const ultimoDato = d => d && d.hora ? hace(Date.now() - d.hora + d.edad_s * 1000) : '';
+  const fechaHora = t => new Date(t).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  // --- Baterías reales ---
-  const REALES = {
-    1: { id: 'A-01', titulo: 'BATERÍA 1', nombre: 'Batería 1', nodo: 'furgoneta', otro: 'coche', zona: { id: 'A', nombre: 'Polígono Canet', lat: 39.6775, lon: -0.2230, d: 0.0022 } },
-    2: { id: 'B-01', titulo: 'BATERÍA 2', nombre: 'Batería 2', nodo: 'coche', otro: 'furgoneta', zona: { id: 'B', nombre: 'Polígono Sagunto', lat: 39.6605, lon: -0.2560, d: 0.0028 } },
+  // Actualiza solo lo que cambia: un toque a medias, el foco y el desplazamiento sobreviven al refresco de cada segundo
+  const molde = document.createElement('template');
+  function morfar(a, b) {
+    const nuevos = [...b.childNodes];
+    nuevos.forEach((n, i) => {
+      const v = a.childNodes[i];
+      if (!v) a.appendChild(n);
+      else if (v.nodeType !== n.nodeType || v.nodeName !== n.nodeName) a.replaceChild(n, v);
+      else if (n.nodeType !== 1) { if (v.nodeValue !== n.nodeValue) v.nodeValue = n.nodeValue; }
+      else {
+        [...v.attributes].forEach(x => { if (!n.hasAttribute(x.name)) v.removeAttribute(x.name); });
+        [...n.attributes].forEach(x => { if (v.getAttribute(x.name) !== x.value) v.setAttribute(x.name, x.value); });
+        morfar(v, n);
+      }
+    });
+    while (a.childNodes.length > nuevos.length) a.removeChild(a.lastChild);
+  }
+  const puesto = new WeakMap();
+  function poner(id, html) {
+    const el = typeof id === 'string' ? $(id) : id;
+    if (puesto.get(el) === html) return;
+    puesto.set(el, html);
+    molde.innerHTML = html;
+    morfar(el, molde.content);
+  }
+  const memoria = {
+    leer(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento sigue funcionando */ } },
   };
-  const tituloReal = n => REALES[n].id + ' · ' + REALES[n].titulo;
-  const datosReal = n => { const e = ultimo || {}; return { d: e[REALES[n].nodo], otro: e[REALES[n].otro] }; };
 
-  function textoLora(d, otro) {
-    if (!conectado(d) || !conectado(otro) || !d.rssi_lora) return suave('Sin señal');
-    const q = d.rssi_lora > -90 ? ['Muy buena', 'c-verde'] : d.rssi_lora > -110 ? ['Buena', 'c-naranja'] : ['Mala', 'c-rojo'];
-    return '<span class="' + q[1] + '">' + d.rssi_lora + ' dB · ' + q[0] + '</span>' + rayas(rayasLora(d.rssi_lora));
-  }
-  function textoWifi(d) {
-    if (d && d.wifi_hora && Date.now() - d.wifi_hora < CONECTADO_MS) return escapar(d.wifi_red || 'Conectado') + rayas(rayasWifi(d.rssi_wifi));
-    return suave(conectado(d) ? 'Por LoRa' : 'Sin datos');
-  }
-  function textoGps(d) {
-    if (!d || !d.gps) return suave('Sin conectar');
-    return d.fix ? d.sats + ' satélites · ' + Math.round(d.vel) + ' km/h' : 'Buscando · ' + d.sats + ' satélites';
-  }
-  function textoCorriente(d) {
-    if (!d) return suave('Sin datos');
-    return d.placa_v ? decimal(d.placa_v, 2) + ' V' : 'USB';
-  }
-  const coordenadas = p => decimal(p.lat, 5) + ', ' + decimal(p.lon, 5);
+  // --- Flota: para añadir un dispositivo basta con una línea más; la estación receptora sale de cada placa ---
+  const FLOTA = [
+    { id: 'A-01', nombre: 'Batería 1', nodo: 'furgoneta', otro: 'coche', zona: { id: 'A', nombre: 'Polígono Canet', lat: 39.6775, lon: -0.2230, d: 0.0022 } },
+    { id: 'B-01', nombre: 'Batería 2', nodo: 'coche', otro: 'furgoneta', auxiliar: true, zona: { id: 'B', nombre: 'Polígono Sagunto', lat: 39.6605, lon: -0.2560, d: 0.0028 } },
+  ];
+  const AVISO_V = 3.0, CRITICO_V = 2.8, AVISO_V_ALTA = 3.6, CRITICO_V_ALTA = 3.65, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
+  const AUX_CRITICO = 11.8, AUX_AVISO = 12.2, AUX_ALTA = 14.8, AUX_MUY_ALTA = 15.5;   // batería auxiliar de 12 V, como en la pantalla del coche
+  const NOMBRES_TIPO = { tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
 
-  function pintarBaldosaReal(n) {
-    const { d } = datosReal(n), ok = conectado(d), el = document.querySelector('[data-bateria="' + n + '"]');
-    el.className = 'baldosa ' + (ok ? 'n0' : 'apagada');
-    el.querySelector('[data-b]').textContent = ultimoDato(d) ? 'Último dato ' + ultimoDato(d) : 'Sin datos';
-    el.querySelector('em').textContent = ok ? 'CONECTADO' : 'NO CONECTADO';
+  function alarmasCeldas(v) {
+    const lista = [];
+    if (!v || !v.length) return lista;
+    const vMin = Math.min(...v), vMax = Math.max(...v), cMin = v.indexOf(vMin) + 1, cMax = v.indexOf(vMax) + 1;
+    if (vMin < CRITICO_V) lista.push({ tipo: 'tension_baja', nivel: 2, texto: 'Celda ' + cMin + ' a ' + decimal(vMin, 2) + ' V: por debajo de ' + decimal(CRITICO_V, 2) + ' V' });
+    else if (vMin < AVISO_V) lista.push({ tipo: 'tension_baja', nivel: 1, texto: 'Celda ' + cMin + ' a ' + decimal(vMin, 2) + ' V: por debajo de ' + decimal(AVISO_V, 2) + ' V' });
+    else if (vMax - vMin > DESEQ_V) lista.push({ tipo: 'desequilibrio', nivel: 1, texto: 'Diferencia entre celdas de ' + Math.round((vMax - vMin) * 1000) + ' mV' });
+    if (vMax >= CRITICO_V_ALTA) lista.push({ tipo: 'tension_alta', nivel: 2, texto: 'Celda ' + cMax + ' a ' + decimal(vMax, 2) + ' V: por encima de ' + decimal(CRITICO_V_ALTA, 2) + ' V' });
+    else if (vMax >= AVISO_V_ALTA) lista.push({ tipo: 'tension_alta', nivel: 1, texto: 'Celda ' + cMax + ' a ' + decimal(vMax, 2) + ' V: por encima de ' + decimal(AVISO_V_ALTA, 2) + ' V' });
+    return lista;
+  }
+  function alarmasTemperatura(t) {
+    if (t === null) return [];
+    if (t >= CRITICO_T) return [{ tipo: 'temperatura', nivel: 2, texto: 'Temperatura de ' + decimal(t, 1) + ' ºC' }];
+    if (t >= AVISO_T) return [{ tipo: 'temperatura', nivel: 1, texto: 'Temperatura de ' + decimal(t, 1) + ' ºC' }];
+    return [];
+  }
+  function alarmasComunicacion(x) {
+    if (x.conectado || !x.ultimaMs) return [];
+    // Primero es un aviso; si dura, pasa a crítica en lugar de sumar una segunda alarma
+    const parado = Date.now() - x.ultimaMs;
+    if (parado >= PERDIDA_MS) return [{ tipo: 'comunicacion', nivel: 2, desde: x.ultimaMs, texto: 'Sin comunicación desde ' + hace(parado) }];
+    return [{ tipo: 'desconectado', nivel: 1, desde: x.ultimaMs, texto: 'No transmite desde ' + hace(parado) }];
+  }
+  function alarmasAnomalas(d) {
+    const raros = [];
+    if (d.hora > Date.now() + 300000) raros.push('hora en el futuro');
+    if (d.placa_v && (d.placa_v < 2.5 || d.placa_v > 6)) raros.push('alimentación de ' + decimal(d.placa_v, 2) + ' V');
+    if (d.rssi_lora > 0 || d.rssi_lora < -150) raros.push('RSSI de ' + d.rssi_lora + ' dB');
+    if (d.lat !== undefined && (Math.abs(d.lat) > 90 || Math.abs(d.lon) > 180)) raros.push('posición fuera de rango');
+    return raros.length ? [{ tipo: 'anomalo', nivel: 1, texto: 'Datos anómalos: ' + raros.join(', ') }] : [];
+  }
+  const nivelDe = lista => lista.reduce((n, a) => Math.max(n, a.nivel), 0);
+
+  function dispositivoReal(c) {
+    const e = ultimo || {}, d = e[c.nodo], otro = e[c.otro], aux = c.auxiliar ? e.bateria : null, tieneAux = !!aux && !!aux.hora;
+    const x = { id: c.id, nombre: c.nombre, real: true, c, d, otro, aux: tieneAux ? aux : null, zona: c.zona.nombre, zonaId: c.zona.id, modelo: 'wBMS-R24 o wBMS-R32', conectado: conectado(d), ultimaMs: d && d.hora ? d.hora - d.edad_s * 1000 : null };
+    x.lat = d && d.lat !== undefined ? d.lat : null; x.lon = x.lat === null ? null : d.lon;
+    const bms = d || {};
+    x.celdas = bms.celdas || null;
+    x.tension = opcional(bms.tension);
+    x.tensionNota = '';
+    if (x.tension === null && x.celdas) x.tension = x.celdas.reduce((a, v) => a + v, 0);
+    if (x.tension === null && tieneAux) { x.tension = aux.voltios; x.tensionNota = conectado(aux) ? 'Sensor de batería auxiliar' : 'Sensor auxiliar · dato antiguo'; }
+    x.soc = opcional(bms.soc); x.temp = opcional(bms.temp); x.rssi = bms.rssi_lora || null; x.snr = opcional(bms.snr); x.corriente = opcional(bms.corriente); x.soh = opcional(bms.soh);
+    x.alarmas = [];
+    if (d) {
+      x.alarmas = alarmasComunicacion(x).concat(alarmasAnomalas(d));
+      if (x.conectado) {
+        x.alarmas = x.alarmas.concat(alarmasCeldas(x.celdas), alarmasTemperatura(x.temp));
+        if (otro && conectado(otro) && !d.rssi_lora) x.alarmas.push({ tipo: 'comunicacion', nivel: 1, texto: 'Enlace LoRa sin señal' });
+      }
+      if (tieneAux && conectado(aux) && !x.celdas) {
+        const v = aux.voltios;
+        if (v < AUX_CRITICO) x.alarmas.push({ tipo: 'tension_baja', nivel: 2, texto: 'Batería auxiliar a ' + decimal(v, 2) + ' V' });
+        else if (v < AUX_AVISO) x.alarmas.push({ tipo: 'tension_baja', nivel: 1, texto: 'Batería auxiliar a ' + decimal(v, 2) + ' V' });
+        else if (v >= AUX_MUY_ALTA) x.alarmas.push({ tipo: 'tension_alta', nivel: 2, texto: 'Batería auxiliar a ' + decimal(v, 2) + ' V' });
+        else if (v >= AUX_ALTA) x.alarmas.push({ tipo: 'tension_alta', nivel: 1, texto: 'Batería auxiliar a ' + decimal(v, 2) + ' V' });
+      }
+    }
+    return x;
   }
 
-  function filasAjustes(d, otro) {
-    let pos = suave('Sin posición');
-    if (d && d.lat !== undefined) pos = coordenadas(d);
-    return fila('Wi-Fi', textoWifi(d)) + fila('Enlace LoRa', textoLora(d, otro)) + fila('Posicionamiento', textoGps(d)) + fila('Posición', pos) + fila('Alimentación', textoCorriente(d));
+  function dispositivoDemo(b) {
+    const v = b.v, vMin = Math.min(...v), vMax = Math.max(...v), tMax = Math.max(...b.t);
+    const x = { id: b.id, nombre: 'Batería ' + b.id, real: false, b, zona: b.pol.nombre, zonaId: b.pol.id, modelo: b.pol.modelo, conectado: !b.corteDesde, ultimaMs: b.corteDesde || Date.now(), lat: b.lat, lon: b.lon, celdas: b.corteDesde ? b.vCorte : v, tension: v.reduce((a, c) => a + c, 0), soc: b.soc, temp: tMax, rssi: b.rssi, snr: b.snr, corriente: b.corriente, soh: b.soh, tensionNota: '' };
+    x.alarmas = alarmasComunicacion(x).concat(alarmasCeldas(v), alarmasTemperatura(tMax));
+    return x;
   }
 
-  // Lo esencial de cualquier BMS. "valor" solo se usa en la DEMO
-  const CAMPOS_BMS = [['tension', 'Tensión total'], ['corriente', 'Corriente'], ['soc', 'Carga (SoC)'], ['soh', 'Salud (SoH)'], ['vMax', 'Celda más alta'], ['vMin', 'Celda más baja'], ['deseq', 'Diferencia entre celdas'], ['tMax', 'Temperatura máxima'], ['alarmas', 'Alarmas']];
-  function filasBms(valor) {
-    return '<div class="filas">' + CAMPOS_BMS.map(c => fila(c[1], valor ? valor(c[0]) : suave('No conectado'))).join('') + '</div>';
+  function recalcular() {
+    FL = FLOTA.map(dispositivoReal).concat(modoDemo ? demo.map(dispositivoDemo) : []);
+    sincronizarIncidencias();
+  }
+  const dispPorId = id => FL.find(x => x.id === id);
+  function estadoDe(x) {
+    if (x.real && !x.d) return { cls: 'gris', baldosa: 'sin', texto: 'SIN DATOS', marca: 'off' };
+    if (!x.conectado) return { cls: 'no', baldosa: 'apagada', texto: 'NO CONECTADO', marca: nivelDe(x.alarmas) === 2 ? 'mal' : 'ojo' };
+    const n = nivelDe(x.alarmas);
+    if (n === 2) return { cls: 'no', baldosa: 'n2', texto: 'CRÍTICA', marca: 'mal' };
+    if (n === 1) return { cls: 'ojo', baldosa: 'n1', texto: 'AVISO', marca: 'ojo' };
+    return { cls: 'si', baldosa: 'n0', texto: x.real ? 'CONECTADO' : 'CORRECTA', marca: 'ok' };
+  }
+  const pastillaDe = x => { const e = estadoDe(x); return '<span class="pastilla ' + e.cls + '">' + e.texto + '</span>'; };
+  const COLOR_MARCA = { ok: '#3ddc84', ojo: '#ffa62b', mal: '#ff6468', off: '#8796a6' };
+  const nombreConMarca = x => escapar(x.id) + (x.real ? '' : ' ' + marcaDemo);
+
+  // Estado de la red LoRa: solo con placas reales
+  function estadoRed() {
+    const reales = FL.filter(x => x.real), vivos = reales.filter(x => x.conectado), con = vivos.filter(x => x.rssi);
+    const mejor = con.length ? Math.max(...con.map(x => x.rssi)) : null;
+    if (!HAY_CLAVE || !ultimo) return { texto: 'Sin datos', sub: 'Sin enlace con la base de datos', tono: 't-gris', vivos: 0, total: reales.length, mejor };
+    if (vivos.length === reales.length && con.length) return { texto: 'Operativa', sub: vivos.length + ' de ' + reales.length + ' nodos · ' + mejor + ' dB', tono: 't-lora', vivos: vivos.length, total: reales.length, mejor };
+    if (vivos.length) return { texto: 'Degradada', sub: vivos.length + ' de ' + reales.length + ' nodos activos', tono: 't-naranja', vivos: vivos.length, total: reales.length, mejor };
+    return { texto: 'Sin actividad', sub: 'Ningún nodo transmite', tono: 't-rojo', vivos: 0, total: reales.length, mejor };
   }
 
-  function pintarDetalle() {
-    if (vista !== 'bateria') return;
-    const { d, otro } = datosReal(actual);
-    $('bat-titulo').textContent = tituloReal(actual);
-    $('bat-estado').innerHTML = pastilla(conectado(d));
-    $('bat-ajustes').innerHTML = filasAjustes(d, otro);
+  // --- Histórico: Firebase solo guarda el último valor, así que se registra aquí lo que va llegando ---
+  const CAMPOS_HORA = ['tension', 'soc', 'temp', 'rssi', 'placa'];
+  const SIETE_DIAS = 6048e5;
+  let bd = null, incidencias = [], recientes = [], guardadoDesde = null, hayNuevo = false;
+  const ultimaHora = {};
+  const promesa = req => new Promise((ok, mal) => { req.onsuccess = () => ok(req.result); req.onerror = () => mal(req.error); });
+  function abrirBd() {
+    return new Promise(ok => {
+      let r;
+      try { r = indexedDB.open('monitor-lora', 1); } catch (e) { ok(null); return; }
+      r.onupgradeneeded = () => {
+        r.result.createObjectStore('paquetes', { keyPath: ['dev', 't'] });
+        r.result.createObjectStore('horas', { keyPath: ['dev', 't'] });
+        r.result.createObjectStore('incidencias', { keyPath: 'k', autoIncrement: true });
+      };
+      r.onsuccess = () => ok(r.result);
+      r.onerror = () => ok(null);
+      r.onblocked = () => ok(null);
+    });
+  }
+  function guardarPaquete(p) {
+    recientes.unshift(p);
+    if (recientes.length > 2000) recientes.pop();
+    hayNuevo = true;
+    if (!guardadoDesde) guardadoDesde = p.t;
+    if (!bd) return;
+    const tx = bd.transaction(['paquetes', 'horas'], 'readwrite');
+    const pet = tx.objectStore('paquetes').add(p);
+    pet.onerror = ev => { ev.preventDefault(); ev.stopPropagation(); };   // ya estaba guardado de una visita anterior
+    pet.onsuccess = () => {
+      const horas = tx.objectStore('horas'), t = Math.floor(p.t / 36e5) * 36e5;
+      const leida = horas.get([p.dev, t]);
+      leida.onsuccess = () => {
+        const h = leida.result || { dev: p.dev, t };
+        CAMPOS_HORA.forEach(c => {
+          if (p[c] === null || p[c] === undefined) return;
+          const n = h[c + '_n'] || 0;
+          h[c] = ((h[c] || 0) * n + p[c]) / (n + 1);
+          h[c + '_n'] = n + 1;
+        });
+        if (p.vmin !== undefined) { h.vmin = Math.min(h.vmin === undefined ? p.vmin : h.vmin, p.vmin); h.vmax = Math.max(h.vmax === undefined ? p.vmax : h.vmax, p.vmax); }
+        horas.put(h);
+      };
+    };
+  }
+  async function leerFilas(tabla, dev, desde) {
+    if (!bd) return tabla === 'paquetes' ? recientes.filter(p => p.dev === dev && p.t >= desde).reverse() : [];
+    try {
+      return await promesa(bd.transaction(tabla).objectStore(tabla).getAll(IDBKeyRange.bound([dev, desde], [dev, Infinity])));
+    } catch (e) { return []; }
+  }
+  async function cargarHistorico() {
+    bd = await abrirBd();
+    if (!bd) return;
+    incidencias = (await promesa(bd.transaction('incidencias').objectStore('incidencias').getAll())).concat(incidencias);
+    // Los paquetes sueltos ocupan mucho: una semana basta, las medias por hora se conservan
+    const almacen = bd.transaction('paquetes', 'readwrite').objectStore('paquetes');
+    const cursor = almacen.openCursor();
+    const limite = Date.now() - SIETE_DIAS, todos = [];
+    await new Promise(fin => {
+      cursor.onsuccess = () => {
+        const c = cursor.result;
+        if (!c) { fin(); return; }
+        if (c.value.t < limite) c.delete(); else todos.push(c.value);
+        c.continue();
+      };
+      cursor.onerror = fin;
+    });
+    todos.sort((a, b) => b.t - a.t);
+    recientes = todos.slice(0, 2000);
+    guardadoDesde = todos.length ? todos[todos.length - 1].t : null;
+    refrescar();
+  }
+  function guardarIncidencia(i) {
+    if (!bd || i.demo) return;
+    try {
+      const pet = bd.transaction('incidencias', 'readwrite').objectStore('incidencias').put(i);
+      pet.onsuccess = () => { i.k = pet.result; };
+    } catch (e) { /* el histórico sigue en memoria */ }
+  }
+  // El histórico de alarmas se escribe al aparecer y al terminar cada una
+  function sincronizarIncidencias() {
+    const fiables = !!crudo && HAY_CLAVE && !sinInternet;
+    const vivas = new Set();
+    FL.forEach(x => x.alarmas.forEach(a => {
+      const clave = x.id + '|' + a.tipo;
+      vivas.add(clave);
+      if (x.real && !fiables) return;
+      let i = incidencias.find(n => !n.fin && n.dev === x.id && n.tipo === a.tipo);
+      if (!i) {
+        i = { dev: x.id, tipo: a.tipo, nivel: a.nivel, motivo: a.texto, t: a.desde || Date.now() };
+        if (!x.real) i.demo = true;
+        incidencias.push(i);
+        if (incidencias.length > 1500) incidencias.shift();
+        guardarIncidencia(i);
+      } else if (a.nivel > i.nivel) { i.nivel = a.nivel; i.motivo = a.texto; guardarIncidencia(i); }
+    }));
+    incidencias.forEach(i => {
+      if (i.fin || vivas.has(i.dev + '|' + i.tipo)) return;
+      const esDemo = !!i.demo;
+      if (!esDemo && !fiables) return;
+      i.fin = Date.now();
+      guardarIncidencia(i);
+    });
   }
 
-  function pintar() {
-    pintarBaldosaReal(1); pintarBaldosaReal(2); pintarDetalle();
-    pintarMarcadoresReales();
-    if (vista === 'mapa') pintarMapa();
+  function registrarPaquetes() {
+    FLOTA.forEach(c => {
+      const d = (ultimo || {})[c.nodo];
+      if (!d || !d.hora || ultimaHora[c.id] === d.hora) return;
+      ultimaHora[c.id] = d.hora;
+      const e = ultimo, aux = c.auxiliar ? e.bateria : null;
+      const directo = d.wifi_hora && Math.abs(d.wifi_hora - d.hora) < 3000;
+      const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
+      if (d.celdas) { p.c = d.celdas; p.vmin = Math.min(...d.celdas); p.vmax = Math.max(...d.celdas); p.tension = d.celdas.reduce((a, v) => a + v, 0); }
+      if (p.tension === null && aux && aux.hora && conectado(aux)) p.tension = aux.voltios;
+      p.soc = opcional(d.soc); p.temp = opcional(d.temp);
+      guardarPaquete(p);
+    });
   }
 
   // Solo se aceptan números y valores conocidos: los datos nunca se tratan como código de la página
@@ -312,20 +655,28 @@
     if (!d || typeof d !== 'object') return undefined;
     const r = { hora: numero(d.hora), edad_s: numero(d.edad_s), gps: d.gps === true, fix: d.fix === true, sats: numero(d.sats), vel: numero(d.vel), placa_v: numero(d.placa_v), rssi_lora: numero(d.rssi_lora), rssi_wifi: numero(d.rssi_wifi), wifi_hora: numero(d.wifi_hora), wifi_red: typeof d.wifi_red === 'string' ? d.wifi_red.slice(0, 32) : '' };
     if (d.lat !== undefined && Number.isFinite(Number(d.lat)) && Number.isFinite(Number(d.lon))) { r.lat = Number(d.lat); r.lon = Number(d.lon); }
+    // Las placas aún no envían estos campos: en cuanto lleguen del BMS se mostrarán sin tocar la aplicación
+    ['snr', 'soc', 'soh', 'temp', 'tension', 'corriente'].forEach(k => { const v = opcional(d[k]); if (v !== null) r[k] = v; });
+    if (Array.isArray(d.celdas) && d.celdas.length && d.celdas.length <= 64 && d.celdas.every(v => Number.isFinite(Number(v)))) r.celdas = d.celdas.map(Number);
     return r;
   }
   function limpiar(e) {
     if (!e || typeof e !== 'object') return {};
-    return { coche: limpiarNodo(e.coche), furgoneta: limpiarNodo(e.furgoneta) };
+    const r = {};
+    FLOTA.forEach(c => { r[c.nodo] = limpiarNodo(e[c.nodo]); });
+    if (e.bateria && typeof e.bateria === 'object') r.bateria = { voltios: numero(e.bateria.voltios), rele: e.bateria.rele === true, hora: numero(e.bateria.hora), edad_s: numero(e.bateria.edad_s) };
+    return r;
   }
 
-  let leyendo = false, enVivo = false, crudo = null;
+  let leyendo = false, enVivo = false, crudo = null, sinInternet = false;
+  function ponerRed(texto, cls) { $('red').textContent = texto; $('red').className = 'pastilla ' + cls; }
   function recibido() {
     ultimo = limpiar(crudo);
+    sinInternet = false;
     // Firebase responde vacío, sin error, si el enlace está mal copiado
-    $('red').textContent = crudo ? 'En línea' : 'Enlace sin datos';
-    $('red').className = 'pastilla ' + (crudo ? 'si' : 'ojo');
-    pintar();
+    ponerRed(crudo ? 'En línea' : 'Enlace sin datos', crudo ? 'si' : 'ojo');
+    registrarPaquetes();
+    refrescar();
   }
   async function leer() {
     if (leyendo) return;   // con mala cobertura, una lectura puede tardar más que el intervalo
@@ -338,12 +689,12 @@
       recibido();
       return;
     } catch (err) {
-      $('red').textContent = 'Sin conexión';
-      $('red').className = 'pastilla no';
+      sinInternet = true;
+      ponerRed('Sin conexión', 'no');
     }
     leyendo = false;
     // También sin internet: lo que deja de actualizarse tiene que pasar a rojo
-    pintar();
+    refrescar();
   }
 
   // Firebase avisa en cuanto una placa sube datos, sin esperar a la siguiente lectura
@@ -369,6 +720,407 @@
     canal.addEventListener('patch', ev => aviso(ev, j => { Object.keys(j.data).forEach(k => { crudo = ponerEn(crudo, j.path + '/' + k, j.data[k]); }); }));
     canal.addEventListener('cancel', () => { enVivo = false; canal.close(); });
     return canal;
+  }
+
+  // --- DEMO: todo se simula aquí mismo y no se escribe nada ---
+  // Cada nave son las cuatro esquinas de un edificio del mapa (noroeste, noreste, sureste, suroeste); solo para situar la DEMO
+  const POLIGONOS = [
+    { id: 'C', nombre: 'Polígono Paterna', modelo: 'wBMS-R24', celdas: 24, sondas: 6, n: 15, cols: 5, nave: [[39.512636, -0.44997], [39.512616, -0.449147], [39.512071, -0.449097], [39.512093, -0.449978]] },
+    { id: 'D', nombre: 'Polígono Riba-roja', modelo: 'wBMS-R32', celdas: 32, sondas: 10, n: 23, cols: 5, nave: [[39.486748, -0.531974], [39.486648, -0.530727], [39.485676, -0.530859], [39.485788, -0.532117]] },
+  ];
+  let demo = [], modoDemo = memoria.leer('modo-demo') === '1';
+  const demoPorId = id => demo.find(b => b.id === id);
+  const azar = (a, b) => a + Math.random() * (b - a);
+  const contorno = p => [[p.lat + p.d, p.lon - 2 * p.d], [p.lat + 1.15 * p.d, p.lon + 2 * p.d], [p.lat - p.d, p.lon + 2.25 * p.d], [p.lat - 1.15 * p.d, p.lon - 1.8 * p.d]];
+
+  function crearDemo() {
+    demo = [];
+    POLIGONOS.forEach(p => {
+      const filas = Math.ceil(p.n / p.cols), [no, ne, se, so] = p.nave;
+      for (let i = 0; i < p.n; i++) {
+        const u = 0.12 + 0.76 * (i % p.cols) / (p.cols - 1), v = 0.15 + 0.7 * Math.floor(i / p.cols) / (filas - 1);
+        const enNave = k => (1 - v) * ((1 - u) * no[k] + u * ne[k]) + v * ((1 - u) * so[k] + u * se[k]);
+        demo.push({
+          id: p.id + '-' + String(i + 1).padStart(2, '0'), pol: p,
+          lat: enNave(0), lon: enNave(1),
+          soc: azar(35, 96), soh: azar(88, 99), corriente: azar(-35, 35), rssi: Math.round(azar(-112, -74)), snr: azar(1, 10),
+          margen: Array.from({ length: p.celdas }, () => azar(-0.008, 0.008)),
+          sondasBase: Array.from({ length: p.sondas }, () => azar(-1.5, 1.5)),
+          calor: 0, fallo: null, corteDesde: 0, v: [], t: [],
+        });
+      }
+    });
+    demoPorId('C-04').fallo = { celda: 6, actual: 2.92, objetivo: 2.92 };
+    demoPorId('D-17').fallo = { celda: 11, actual: 2.74, objetivo: 2.74 };
+    demoPorId('D-09').calor = 27;
+    demo.forEach(actualizarBateria);
+  }
+
+  function actualizarBateria(b) {
+    if (b.corteDesde) return;
+    const parada = b.v.length && nivelDe(alarmasCeldas(b.v)) === 2;
+    b.corriente = parada ? 0 : Math.max(-60, Math.min(60, b.corriente + azar(-2.5, 2.5)));
+    b.soc = Math.max(15, Math.min(98, b.soc + b.corriente * 0.0007));
+    b.rssi = Math.round(Math.max(-118, Math.min(-68, b.rssi + azar(-1.2, 1.2))));
+    b.snr = Math.max(-5, Math.min(12, b.snr + azar(-0.2, 0.2)));
+    const base = 3.2 + 0.0012 * b.soc + b.corriente * 0.0002;
+    b.v = b.margen.map(m => base + m + azar(-0.001, 0.001));
+    if (b.fallo) {
+      const f = b.fallo;
+      f.actual += Math.max(-0.004, Math.min(0.004, f.objetivo - f.actual));
+      b.v[f.celda] = f.actual;
+    }
+    b.t = b.sondasBase.map(m => 24 + Math.abs(b.corriente) * 0.1 + m + b.calor + azar(-0.15, 0.15));
+  }
+  function simularFallo() {
+    const sanas = demo.filter(b => !b.fallo && !b.corteDesde && !alarmasCeldas(b.v).length);
+    if (!sanas.length) return;
+    const b = sanas[Math.floor(Math.random() * sanas.length)], celda = Math.floor(Math.random() * b.pol.celdas);
+    b.fallo = { celda, actual: b.v[celda], objetivo: 2.72 };
+  }
+  function simularCorte() {
+    const sanas = demo.filter(b => !b.corteDesde);
+    if (!sanas.length) return;
+    const b = sanas[Math.floor(Math.random() * sanas.length)];
+    b.corteDesde = Date.now(); b.vCorte = b.v.slice();
+  }
+  function reiniciarDemo() {
+    incidencias = incidencias.filter(i => !i.demo);
+    crearDemo();
+    refrescar();
+  }
+  function cambiarDemo(activo) {
+    modoDemo = activo;
+    memoria.guardar('modo-demo', activo ? '1' : '0');
+    incidencias = incidencias.filter(i => !i.demo);
+    if (activo) crearDemo(); else demo = [];
+    if (!activo && vista === 'ficha' && !dispPorIdReal(actual)) mostrar('inicio');
+    grDisp = null;
+    refrescar();
+    if (mapa) { montarDemoEnMapa(); encuadrarMapa(); }
+  }
+  const dispPorIdReal = id => FLOTA.some(c => c.id === id);
+
+  // --- Gráficas ---
+  const RANGOS = {
+    minutos: { nombre: 'Minutos', titulo: 'Última hora', ms: 36e5, tabla: 'paquetes', hueco: 12e4, barra: 3e5, n: 60, paso: 6e4, amp: 0.006, caida: 0.5, ciclos: 2 },
+    horas: { nombre: 'Horas', titulo: 'Últimas 24 horas', ms: 864e5, tabla: 'paquetes', hueco: 6e5, barra: 36e5, n: 48, paso: 18e5, amp: 0.03, caida: 0.2, ciclos: 2 },
+    dias: { nombre: 'Días', titulo: 'Últimos 30 días', ms: 2592e6, tabla: 'horas', hueco: 108e5, barra: 864e5, n: 60, paso: 432e5, amp: 0.045, caida: 0.06, ciclos: 8 },
+    anios: { nombre: 'Años', titulo: 'Últimos 5 años', ms: 157788e6, tabla: 'horas', hueco: 6048e5, barra: 26298e5, n: 60, paso: 26298e5, amp: 0.03, caida: 0.02, ciclos: 5 },
+  };
+  const botonesRango = (activo, attr) => Object.keys(RANGOS).map(k => '<button type="button" ' + attr + '="' + k + '" aria-pressed="' + (k === activo) + '">' + RANGOS[k].nombre + '</button>').join('');
+  function fechaGraf(ms, rango, larga) {
+    const d = new Date(ms), hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    if (rango === 'minutos' || rango === 'horas') return larga ? d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ', ' + hora : hora;
+    if (rango === 'dias') return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + (larga ? ', ' + hora : '');
+    return d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+  }
+  const reducir = (filas, max) => { if (filas.length <= max) return filas; const p = filas.length / max, r = []; for (let i = 0; i < max; i++) r.push(filas[Math.floor(i * p)]); r[max - 1] = filas[filas.length - 1]; return r; };
+
+  // Una gráfica temporal: línea (y banda si hay máximo y mínimo) o barras, con cruz, ficha flotante y vista en tabla
+  function crearGrafica(caja) {
+    caja.innerHTML = '<div class="grafica"><svg role="img" tabindex="0"></svg><div class="graf-tip" hidden></div></div><p class="graf-vacio" hidden></p><details class="tabla-graf" hidden><summary>Ver los datos en tabla</summary><div class="marco-tabla"></div></details>';
+    const svg = caja.querySelector('svg'), tip = caja.querySelector('.graf-tip'), vacio = caja.querySelector('.graf-vacio'), detalles = caja.querySelector('details'), marco = caja.querySelector('.marco-tabla');
+    let S = null, escala = null, indice = null;
+    const valor = (v, s) => v === null || v === undefined ? '—' : decimal(v, s.dec) + ' ' + s.unidad;
+    function pintarCruz() {
+      const cruz = svg.querySelector('.cruz');
+      if (!cruz || !S) return;
+      const p = indice === null ? null : S.puntos[indice];
+      if (!p) { cruz.innerHTML = ''; tip.hidden = true; return; }
+      const e = escala, cx = e.x(p.t);
+      cruz.innerHTML = '<line class="g-cruz" x1="' + cx + '" x2="' + cx + '" y1="' + e.arr + '" y2="' + (e.alto - e.aba) + '"/>' + (p.v !== null && p.v !== undefined && !S.barras ? '<circle class="g-punto" cx="' + cx + '" cy="' + e.y(p.v) + '" r="4"/>' : '');
+      tip.innerHTML = '<small>' + fechaGraf(p.t, S.rango, true) + '</small><div><i></i><b>' + valor(p.v, S) + '</b><small>' + escapar(S.nombre) + '</small></div>' + (p.max !== undefined ? '<div><i class="banda"></i><b>' + valor(p.max, S) + '</b><small>Más alta</small></div><div><i class="banda"></i><b>' + valor(p.min, S) + '</b><small>Más baja</small></div>' : '');
+      tip.hidden = false;
+      const hueco = tip.offsetWidth + 12;
+      tip.style.left = (cx + hueco > e.ancho ? Math.max(0, cx - hueco) : cx + 12) + 'px';
+    }
+    function pintarTabla() {
+      if (!S || !detalles.open) return;
+      const banda = S.puntos.some(p => p.max !== undefined);
+      marco.innerHTML = '<table><thead><tr><th scope="col">Fecha</th><th scope="col">' + escapar(S.nombre) + '</th>' + (banda ? '<th scope="col">Más alta</th><th scope="col">Más baja</th>' : '') + '</tr></thead><tbody>' +
+        S.puntos.slice().reverse().map(p => '<tr><td>' + fechaGraf(p.t, S.rango, true) + '</td><td>' + valor(p.v, S) + '</td>' + (banda ? '<td>' + valor(p.max, S) + '</td><td>' + valor(p.min, S) + '</td>' : '') + '</tr>').join('') + '</tbody></table>';
+    }
+    function pintar(o) {
+      S = o;
+      const hay = o.puntos.some(p => p.v !== null && p.v !== undefined || p.max !== undefined);
+      caja.querySelector('.grafica').hidden = !hay;
+      detalles.hidden = !hay;
+      vacio.hidden = hay;
+      if (!hay) { vacio.textContent = o.vacio; return; }
+      const ancho = svg.clientWidth || 320, alto = svg.clientHeight || 220, izq = 42, der = o.barras ? 12 : 56, arr = 10, aba = 24;
+      const valores = [];
+      o.puntos.forEach(p => { [p.v, p.max, p.min].forEach(v => { if (v !== null && v !== undefined) valores.push(v); }); });
+      let bajo = o.barras ? 0 : Math.min(...valores), alto_v = Math.max(...valores);
+      const margen = Math.max((alto_v - bajo) * 0.5, o.margen || 0);
+      const lineas = (o.umbrales || []).filter(l => l[0] >= bajo - margen && l[0] <= alto_v + margen);
+      lineas.forEach(l => { bajo = Math.min(bajo, l[0]); alto_v = Math.max(alto_v, l[0]); });
+      if (alto_v - bajo < (o.minimo || 0.01)) { const c = (alto_v + bajo) / 2, m = (o.minimo || 0.01) / 2; bajo = o.barras ? 0 : c - m; alto_v = c + m; }
+      const paso = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100].find(p => (!o.barras || p >= 1) && (alto_v - bajo) / p <= 4) || 200;
+      const y0 = Math.floor(bajo / paso) * paso, y1 = Math.ceil(alto_v / paso) * paso, decEje = paso < 0.1 ? 2 : paso < 1 ? 1 : 0;
+      const x = t => izq + (t - o.desde) / (o.hasta - o.desde) * (ancho - izq - der), y = v => arr + (y1 - v) / (y1 - y0) * (alto - arr - aba);
+      let dibujo = '';
+      for (let v = y0; v <= y1 + paso / 2; v += paso) dibujo += '<line class="g-rejilla" x1="' + izq + '" x2="' + (ancho - der) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text x="' + (izq - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + decimal(v, decEje) + '</text>';
+      [0, 1 / 3, 2 / 3, 1].forEach(f => { dibujo += '<text x="' + (izq + f * (ancho - izq - der)) + '" y="' + (alto - 6) + '" text-anchor="' + (f === 0 ? 'start' : f === 1 ? 'end' : 'middle') + '">' + fechaGraf(o.desde + f * (o.hasta - o.desde), o.rango) + '</text>'; });
+      lineas.forEach(l => { dibujo += '<line class="' + l[2] + '" x1="' + izq + '" x2="' + (ancho - der) + '" y1="' + y(l[0]) + '" y2="' + y(l[0]) + '"/><text x="' + (ancho - der + 5) + '" y="' + (y(l[0]) + 4) + '">' + l[1] + '</text>'; });
+      if (o.barras) {
+        const b = Math.max(2, (ancho - izq - der) / o.puntos.length - 2);
+        o.puntos.forEach(p => { if (p.v) dibujo += '<rect class="g-barra" x="' + (x(p.t) - b / 2).toFixed(1) + '" y="' + y(p.v).toFixed(1) + '" width="' + b.toFixed(1) + '" height="' + (y(0) - y(p.v)).toFixed(1) + '" rx="2"/>'; });
+      } else {
+        // Los huecos sin datos se dejan en blanco: nunca se une lo que no se ha medido
+        const tramos = [];
+        o.puntos.forEach((p, i) => { if (i === 0 || p.t - o.puntos[i - 1].t > o.hueco) tramos.push([]); tramos[tramos.length - 1].push(p); });
+        tramos.forEach(tr => {
+          const conBanda = tr.filter(p => p.max !== undefined);
+          if (conBanda.length > 1) dibujo += '<path class="g-banda" d="' + conBanda.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.max).toFixed(1)).join('') + conBanda.slice().reverse().map(p => 'L' + x(p.t).toFixed(1) + ' ' + y(p.min).toFixed(1)).join('') + 'Z"/>';
+          const conValor = tr.filter(p => p.v !== null && p.v !== undefined);
+          if (conValor.length > 1) dibujo += '<path class="g-linea" d="' + conValor.map((p, i) => (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1)).join('') + '"/>';
+          else if (conValor.length) dibujo += '<circle class="g-punto" cx="' + x(conValor[0].t) + '" cy="' + y(conValor[0].v) + '" r="3"/>';
+        });
+        const conV = o.puntos.filter(p => p.v !== null && p.v !== undefined), fin = conV[conV.length - 1];
+        if (fin) {
+          // La etiqueta del valor actual se aparta si pisaría el borde superior o la de un umbral
+          const yFin = y(fin.v) - 7, yEtiqueta = yFin < arr + 8 || lineas.some(l => Math.abs(y(l[0]) + 4 - yFin) < 14) ? y(fin.v) + 16 : yFin;
+          dibujo += '<circle class="g-punto" cx="' + x(fin.t) + '" cy="' + y(fin.v) + '" r="4"/><text class="fin" x="' + (x(fin.t) + 7) + '" y="' + yEtiqueta + '">' + decimal(fin.v, o.dec) + ' ' + o.unidad + '</text>';
+        }
+      }
+      svg.setAttribute('viewBox', '0 0 ' + ancho + ' ' + alto);
+      svg.setAttribute('class', o.lora ? 'lora-g' : '');
+      svg.setAttribute('aria-label', o.nombre + ', ' + RANGOS[o.rango].titulo.toLowerCase() + '. Usa las flechas para recorrer los datos.');
+      svg.innerHTML = dibujo + '<g class="cruz"></g>';
+      escala = { x, y, izq, ancho, der, arr, alto, aba };
+      pintarTabla();
+      pintarCruz();
+    }
+    const cercano = t => {
+      let mejor = 0;
+      S.puntos.forEach((p, i) => { if (Math.abs(p.t - t) < Math.abs(S.puntos[mejor].t - t)) mejor = i; });
+      return mejor;
+    };
+    svg.addEventListener('pointermove', ev => {
+      if (!escala || !S) return;
+      const c = svg.getBoundingClientRect(), e = escala;
+      indice = cercano(S.desde + (ev.clientX - c.left - e.izq) / (e.ancho - e.izq - e.der) * (S.hasta - S.desde));
+      pintarCruz();
+    });
+    svg.addEventListener('pointerleave', () => { indice = null; pintarCruz(); });
+    svg.addEventListener('blur', () => { indice = null; pintarCruz(); });
+    svg.addEventListener('keydown', ev => {
+      if ((ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') || !S) return;
+      ev.preventDefault();
+      const n = S.puntos.length - 1, base = indice === null ? n : indice;
+      indice = Math.max(0, Math.min(n, base + (ev.key === 'ArrowLeft' ? -1 : 1)));
+      pintarCruz();
+    });
+    detalles.addEventListener('toggle', pintarTabla);
+    return { pintar, repintar: () => { if (S) pintar(S); } };
+  }
+
+  // Histórico de la DEMO: se calcula a partir de cada batería y termina en su valor actual
+  const ruido = (a, b, c) => { const x = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return x - Math.floor(x) - 0.5; };
+  const semilla = id => [...id].reduce((s, c) => s + c.charCodeAt(0), 0);
+  function historialCeldasDemo(b, rango, celda) {
+    const R = RANGOS[rango], s = semilla(b.id) + Object.keys(RANGOS).indexOf(rango) * 13, ahora = Date.now();
+    const sanas = b.v.filter((v, j) => !b.fallo || j !== b.fallo.celda);
+    const media = sanas.reduce((a, v) => a + v, 0) / sanas.length;
+    const puntos = [];
+    for (let i = 0; i <= R.n; i++) {
+      const edad = (R.n - i) / R.n, atenuar = Math.min(1, edad * 6);
+      const ciclo = Math.sin(i / R.n * R.ciclos * 2 * Math.PI + s) * R.amp * atenuar;
+      const v = b.v.map((actual, j) => {
+        const cambio = ciclo + b.margen[j] * (rango === 'anios' ? -0.6 * edad : 0) + ruido(s, i, j) * 0.003 * atenuar;
+        if (!b.fallo || j !== b.fallo.celda) return actual + cambio;
+        // La celda que falla estaba sana hasta hace poco y baja hasta su valor de ahora
+        const t = Math.min(1, Math.max(0, 1 - (edad - R.caida / 2) / (R.caida / 2)));
+        return media + b.margen[j] + cambio + (actual - media - b.margen[j]) * t * t * (3 - 2 * t);
+      });
+      puntos.push({ t: ahora - (R.n - i) * R.paso, v: v[celda], max: Math.max(...v), min: Math.min(...v) });
+    }
+    return puntos;
+  }
+  function serieDemo(x, metrica, rango) {
+    const R = RANGOS[rango], s = semilla(x.id) + metrica.length * 7 + Object.keys(RANGOS).indexOf(rango) * 13, ahora = Date.now();
+    const base = { tension: x.tension, soc: x.soc, temp: x.temp, rssi: x.rssi }[metrica];
+    const amp = { tension: R.amp * x.celdas.length, soc: 18, temp: 5, rssi: 7 }[metrica];
+    if (base === undefined) return [];
+    const puntos = [];
+    for (let i = 0; i <= R.n; i++) {
+      const edad = (R.n - i) / R.n, a = Math.min(1, edad * 6);
+      let v = base + a * (Math.sin(i / R.n * R.ciclos * 2 * Math.PI + s) * amp + ruido(s, i, 1) * amp * 0.25);
+      if (metrica === 'soc') v = Math.max(5, Math.min(100, v));
+      puntos.push({ t: ahora - (R.n - i) * R.paso, v });
+    }
+    return puntos;
+  }
+
+  // Ficha
+  let graficaCelda = null, rangoCelda = 'horas', celdaGraf = 0, celdasDe = null, tokenCelda = 0, ultimaCarga = 0;
+  const noDisp = (t) => '<b class="no-disp">' + t + '</b>';
+  const medida = (t, v, n) => '<div class="medida"><small>' + t + '</small>' + v + (n ? '<span>' + n + '</span>' : '') + '</div>';
+  function textoLora(x) {
+    if (x.rssi === null || x.rssi === undefined) return suave('Sin señal');
+    if (x.real && (!x.conectado || !conectado(x.otro))) return suave('Sin señal');
+    const q = x.rssi > -90 ? ['Muy buena', 'c-verde'] : x.rssi > -110 ? ['Buena', 'c-naranja'] : ['Mala', 'c-rojo'];
+    return '<span class="' + q[1] + '">' + x.rssi + ' dB · ' + q[0] + '</span>' + rayas(rayasLora(x.rssi));
+  }
+  function textoWifi(d) {
+    if (d && d.wifi_hora && Date.now() - d.wifi_hora < CONECTADO_MS) return escapar(d.wifi_red || 'Conectado') + rayas(rayasWifi(d.rssi_wifi));
+    return suave(conectado(d) ? 'Por LoRa' : 'Sin datos');
+  }
+  function textoGps(d) {
+    if (!d || !d.gps) return suave('Sin conectar');
+    return d.fix ? d.sats + ' satélites · ' + Math.round(d.vel) + ' km/h' : 'Buscando · ' + d.sats + ' satélites';
+  }
+  function textoCorriente(d) {
+    if (!d) return suave('Sin datos');
+    return d.placa_v ? decimal(d.placa_v, 2) + ' V' : 'USB';
+  }
+  const coordenadas = p => decimal(p.lat, 5) + ', ' + decimal(p.lon, 5);
+  const ultimoDatoTexto = x => x.ultimaMs ? hace(Date.now() - x.ultimaMs) : 'Sin datos';
+  const socTexto = x => x.soc === null || x.soc === undefined ? null : Math.round(x.soc) + ' %';
+
+  function pintarFicha() {
+    const x = dispPorId(actual);
+    if (!x) return;
+    $('fi-titulo').textContent = x.id + ' · ' + x.nombre;
+    poner('fi-marca', x.real ? '' : marcaDemo);
+    poner('fi-estado', pastillaDe(x));
+    poner('fi-alarmas', x.alarmas.map(a => '<div class="alarma n' + a.nivel + ' fija">' + icono('aviso') + '<b>' + (a.nivel === 2 ? 'Crítica' : 'Aviso') + '</b><span>' + escapar(a.texto) + '</span></div>').join(''));
+    $('fi-alarmas').hidden = !x.alarmas.length;
+    const sinBms = x.real ? 'BMS no conectado' : 'No disponible';
+    const ubic = x.lat !== null ? escapar(x.zona) + '<span>' + coordenadas(x) + '</span>' : escapar(x.zona) + '<span>Sin posición GPS</span>';
+    poner('fi-medidas', [
+      medida('Identificador', '<b>' + escapar(x.id) + '</b>'),
+      medida('Nombre', '<b>' + escapar(x.nombre) + '</b>'),
+      '<div class="medida"><small>Ubicación</small><b style="font-size:14.5px">' + ubic + '</b></div>',
+      medida('Tensión total', x.tension !== null ? '<b>' + decimal(x.tension, x.tension > 30 ? 1 : 2) + ' V</b>' : noDisp(sinBms), x.tensionNota),
+      medida('Carga', socTexto(x) ? '<b>' + socTexto(x) + '</b>' : noDisp(sinBms)),
+      medida('Temperatura', x.temp !== null && x.temp !== undefined ? '<b>' + decimal(x.temp, 1) + ' ºC</b>' : noDisp(sinBms)),
+      medida('Comunicación', '<b class="' + (x.conectado ? 'c-verde' : 'c-rojo') + '" style="font-size:14.5px">' + (x.conectado ? 'En línea' : (x.real && !x.d ? 'Sin datos' : 'No conectado')) + '</b>'),
+      medida('RSSI', x.rssi ? '<b class="c-lora">' + x.rssi + ' dB</b>' : noDisp('No disponible')),
+      medida('SNR', x.snr !== null && x.snr !== undefined ? '<b class="c-lora">' + decimal(x.snr, 1) + ' dB</b>' : noDisp(x.real ? 'La placa no lo envía' : 'No disponible')),
+      medida('Última recepción', x.ultimaMs ? '<b style="font-size:14.5px">' + ultimoDatoTexto(x) + '</b>' : noDisp('Sin datos'), x.ultimaMs ? fechaHora(x.ultimaMs) : ''),
+    ].join(''));
+    if (x.real) {
+      poner('fi-ajustes', fila('Wi-Fi', textoWifi(x.d)) + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', textoGps(x.d)) + fila('Posición', x.lat !== null ? coordenadas(x) : suave('Sin posición')) + fila('Alimentación', textoCorriente(x.d)));
+    } else {
+      poner('fi-ajustes', fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(x)) + fila('Alimentación', 'Simulada'));
+    }
+    const hayBms = !!x.celdas || x.soc !== null && x.soc !== undefined;
+    poner('fi-bms-estado', x.real && !hayBms ? '<span class="pastilla no">NO CONECTADO</span>' : '');
+    const nv = t => hayBms ? t : suave('No conectado');
+    const r = x.celdas ? { vMax: Math.max(...x.celdas), vMin: Math.min(...x.celdas) } : null;
+    let filasBms = fila('Modelo', escapar(x.modelo)) +
+      fila('Tensión total', nv(x.tension !== null && x.celdas ? decimal(x.tension, 1) + ' V' : '—')) +
+      fila('Corriente', nv(x.corriente !== null && x.corriente !== undefined ? decimal(x.corriente, 1) + ' A' : '—')) +
+      fila('Carga (SoC)', nv(socTexto(x) || '—')) + fila('Salud (SoH)', nv(x.soh !== null && x.soh !== undefined ? Math.round(x.soh) + ' %' : '—')) +
+      fila('Temperatura máxima', nv(x.temp !== null && x.temp !== undefined ? decimal(x.temp, 1) + ' ºC' : '—'));
+    if (x.aux) filasBms += fila('Batería auxiliar', decimal(x.aux.voltios, 2) + ' V') + fila('Relé', x.aux.rele ? 'Activado' : 'Desactivado');
+    poner('fi-bms', filasBms);
+
+    // Celdas
+    $('fi-sin-celdas').hidden = !!x.celdas;
+    $('fi-con-celdas').hidden = !x.celdas;
+    $('fi-rangos').hidden = !x.celdas;
+    if (!x.celdas) return;
+    if (celdasDe !== x.id) { celdasDe = x.id; celdaGraf = x.celdas.indexOf(r.vMin); }
+    const dif = r.vMax - r.vMin, cMax = x.celdas.indexOf(r.vMax) + 1, cMin = x.celdas.indexOf(r.vMin) + 1;
+    poner('fi-resumen', '<div><small>Tensión máxima</small><b>' + decimal(r.vMax, 3) + ' V</b> ' + suave('celda ' + cMax) + '</div><div><small>Tensión mínima</small><b>' + decimal(r.vMin, 3) + ' V</b> ' + suave('celda ' + cMin) + '</div><div><small>Diferencia</small><b>' + Math.round(dif * 1000) + ' mV</b></div><div><small>Equilibrio</small><b class="' + (dif > DESEQ_V ? 'c-naranja' : 'c-verde') + '">' + (dif > DESEQ_V ? 'Desequilibrada' : 'Correcto') + '</b></div>');
+    const bajo = Math.min(r.vMin, CRITICO_V), rango = Math.max(0.01, Math.max(r.vMax, AVISO_V) - bajo);
+    poner('fi-celdas', x.celdas.map((v, i) => '<button class="celda n' + (v < CRITICO_V || v >= CRITICO_V_ALTA ? 2 : v < AVISO_V || v >= AVISO_V_ALTA ? 1 : 0) + (i === celdaGraf ? ' elegida' : '') + '" type="button" data-celda="' + i + '" aria-pressed="' + (i === celdaGraf) + '"><small>Celda ' + (i + 1) + '</small><span>' + decimal(v, 3) + '</span><i style="width:' + Math.round((v - bajo) / rango * 100) + '%"></i>' + (i === cMax - 1 ? '<em>MÁX</em>' : i === cMin - 1 ? '<em>MÍN</em>' : '') + '</button>').join(''));
+    poner('fi-rangos', botonesRango(rangoCelda, 'data-rango'));
+    poner('fi-leyenda', '<span>' + RANGOS[rangoCelda].titulo + (x.real ? '' : ' · simulado') + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>');
+    pintarGraficaCelda(x);
+  }
+  async function pintarGraficaCelda(x) {
+    if (!graficaCelda) graficaCelda = crearGrafica($('fi-grafica'));
+    const R = RANGOS[rangoCelda], hasta = Date.now(), desde = hasta - R.ms, token = ++tokenCelda, celda = celdaGraf;
+    let puntos;
+    if (x.real) {
+      const filas = await leerFilas(R.tabla, x.id, desde);
+      if (token !== tokenCelda) return;
+      puntos = reducir(filas.filter(f => f.vmin !== undefined), 300).map(f => ({ t: f.t, v: f.c ? f.c[celda] : null, max: f.vmax, min: f.vmin }));
+    } else puntos = historialCeldasDemo(x.b, rangoCelda, celda);
+    graficaCelda.pintar({ puntos, desde, hasta, rango: rangoCelda, hueco: x.real ? R.hueco : Infinity, unidad: 'V', dec: 3, nombre: 'Celda ' + (celda + 1), margen: 0.1, umbrales: [[AVISO_V, 'Aviso', 'u-naranja'], [CRITICO_V, 'Crítica', 'u-rojo']], vacio: 'Todavía no hay histórico de celdas.' });
+  }
+
+  // Inicio
+  const kpi = (ic, tit, val, sub, tono, destino, extra, clase) => '<button class="kpi ' + (tono || '') + ' ' + (clase || '') + '" type="button" data-ir="' + destino + '"><small>' + icono(ic) + tit + '</small><strong' + (String(val).length > 7 ? ' class="medio"' : '') + '>' + val + '</strong><span>' + sub + '</span>' + (extra || '') + '</button>';
+  function resumenFlota() {
+    const total = FL.length, reales = FL.filter(x => x.real).length, vivos = FL.filter(x => x.conectado).length;
+    const criticas = FL.filter(x => nivelDe(x.alarmas) === 2).length, avisos = FL.filter(x => nivelDe(x.alarmas) === 1).length;
+    return { total, reales, simuladas: total - reales, vivos, apagados: total - vivos, criticas, avisos, conAlarma: criticas + avisos };
+  }
+  const socMedio = lista => { const c = lista.filter(x => x.soc !== null && x.soc !== undefined); return c.length ? c.reduce((a, x) => a + x.soc, 0) / c.length : null; };
+  function ultimaRecepcionReal() {
+    const c = FL.filter(x => x.real && x.ultimaMs);
+    return c.length ? c.reduce((a, x) => x.ultimaMs > a.ultimaMs ? x : a) : null;
+  }
+  function pintarInicio() {
+    const r = resumenFlota(), red = estadoRed(), u = ultimaRecepcionReal();
+    const socReal = socMedio(FL.filter(x => x.real)), socDemo = socMedio(FL.filter(x => !x.real)), soc = socReal !== null ? socReal : socDemo;
+    poner('ini-kpis',
+      kpi('baterias', 'Registradas', r.total, r.simuladas ? r.reales + ' reales · ' + r.simuladas + ' DEMO' : 'Baterías de la flota', 't-gris', 'baterias') +
+      kpi('ok', 'Conectadas', r.vivos, 'Transmitiendo ahora', r.vivos ? 't-verde' : 't-gris', 'baterias') +
+      kpi('corte', 'Desconectadas', r.apagados, 'Sin datos recientes', r.apagados ? 't-rojo' : 't-gris', 'baterias') +
+      kpi('alarmas', 'Con alarmas', r.conAlarma, r.criticas + ' críticas · ' + r.avisos + ' avisos', r.criticas ? 't-rojo' : r.avisos ? 't-naranja' : 't-verde', 'alarmas') +
+      kpi('baterias', 'Carga general', soc !== null ? Math.round(soc) + ' %' : 'Sin datos', soc === null ? 'BMS no conectado' : socReal !== null ? 'Media de las baterías con BMS' : 'Solo baterías DEMO', soc === null ? 't-gris' : 't-verde', 'graficas', soc !== null ? '<div class="barra-soc"><i style="width:' + Math.round(soc) + '%"></i></div>' : '') +
+      kpi('reloj', 'Última recepción', u ? hace(Date.now() - u.ultimaMs).replace('hace ', '') : 'Sin datos', u ? u.id + ' · ' + new Date(u.ultimaMs).toLocaleTimeString('es-ES') : 'Ninguna placa real todavía', u && u.conectado ? 't-verde' : 't-gris', 'comunicaciones') +
+      kpi('comunicaciones', 'Red LoRa', red.texto, red.sub, red.tono, 'comunicaciones', '', 'ancho'));
+    const activas = alarmasActivas();
+    poner('ini-alarmas', activas.length ? '<div class="alarmas">' + activas.slice(0, 6).map(filaAlarma).join('') + '</div>' + (activas.length > 6 ? '<p class="pista">Y ' + (activas.length - 6) + ' más en el centro de alarmas.</p>' : '') : '<div class="vacio">Sin alarmas activas</div>');
+    const zonas = gruposPorZona(FL);
+    poner('ini-zonas', zonas.map(z => {
+      const crit = z.lista.filter(x => nivelDe(x.alarmas) === 2).length, av = z.lista.filter(x => nivelDe(x.alarmas) === 1).length;
+      return '<button class="zona-fila" type="button" data-buscar-zona="' + escapar(z.nombre) + '"><span><b>' + escapar(z.nombre) + '</b> ' + (z.demo ? marcaDemo : '') + '<br>' + suave(z.lista.length + (z.lista.length === 1 ? ' batería' : ' baterías') + ' · ' + z.lista.filter(x => x.conectado).length + ' conectadas') + '</span><span class="pastilla ' + (crit ? 'no' : av ? 'ojo' : 'si') + '">' + (crit ? crit + ' crít.' : av ? av + ' aviso' + (av > 1 ? 's' : '') : 'OK') + '</span></button>';
+    }).join(''));
+    poner('ini-demo', modoDemo ?
+      '<div class="titulo"><h2>' + marcaDemo + ' Baterías simuladas</h2></div><div class="acciones"><button class="boton" type="button" data-demo-fallo>Simular bajada de celda</button><button class="boton" type="button" data-demo-corte>Simular corte de comunicación</button><button class="boton" type="button" data-demo-reiniciar>Reiniciar</button></div>' :
+      '<div class="titulo" style="margin:0"><h2>Modo DEMO desactivado</h2><button class="boton" type="button" data-demo-cambiar>Ver DEMO</button></div><p class="pista">La plataforma muestra solo baterías reales. El modo DEMO añade polígonos simulados con alarmas para enseñarla.</p>');
+  }
+  function alarmasActivas() {
+    const l = [];
+    FL.forEach(x => x.alarmas.forEach(a => l.push({ x, ...a })));
+    return l.sort((a, b) => b.nivel - a.nivel || a.x.id.localeCompare(b.x.id));
+  }
+  const filaAlarma = a => '<button class="alarma n' + a.nivel + '" type="button" data-ficha="' + a.x.id + '">' + icono('aviso') + '<b>' + nombreConMarca(a.x) + '</b><span>' + NOMBRES_TIPO[a.tipo] + '<small>' + escapar(a.texto) + '</small></span></button>';
+  function gruposPorZona(lista) {
+    const g = [];
+    lista.forEach(x => {
+      let z = g.find(n => n.nombre === x.zona);
+      if (!z) { z = { nombre: x.zona, demo: !x.real, lista: [] }; g.push(z); }
+      z.lista.push(x);
+    });
+    return g;
+  }
+
+  // Baterías
+  let filtroBat = 'todos';
+  const FILTROS = { todos: 'Todos', conectados: 'Conectados', desconectados: 'Desconectados', alarmas: 'Alarmas' };
+  const pasaFiltro = (x, f) => f === 'todos' || (f === 'conectados' && x.conectado) || (f === 'desconectados' && !x.conectado) || (f === 'alarmas' && x.alarmas.length > 0);
+  const botonesFiltro = (activo, attr) => Object.keys(FILTROS).map(k => '<button type="button" ' + attr + '="' + k + '" aria-pressed="' + (k === activo) + '">' + FILTROS[k] + '</button>').join('');
+  // Buscador: "d 17", "D17" y "d-17" encuentran la misma batería
+  const plano = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  function coincide(x, q) {
+    if (!q) return true;
+    const m = q.match(/^([a-z])(\d+)$/);
+    if (m) return x.id[0].toLowerCase() === m[1] && Number(x.id.slice(2)) === Number(m[2]);
+    return plano(x.id).startsWith(q) || (q.length >= 3 && [x.nombre, x.zona, x.real ? 'real' : 'demo'].some(t => plano(t).includes(q)));
+  }
+  function baldosa(x) {
+    const e = estadoDe(x), a = [];
+    if (x.tension !== null) a.push(decimal(x.tension, x.tension > 30 ? 0 : 1) + ' V');
+    if (socTexto(x)) a.push('SoC ' + socTexto(x));
+    return '<button class="baldosa ' + e.baldosa + '" type="button" data-ficha="' + x.id + '"><strong>' + nombreConMarca(x) + '</strong><span>' + (x.real ? escapar(x.nombre) : '') + (x.real && a.length ? ' · ' : '') + a.join(' · ') + '</span><span>' + (x.ultimaMs ? (x.conectado ? (x.temp !== null && x.temp !== undefined ? Math.round(x.temp) + ' ºC · ' : '') + 'En línea' : 'Último ' + ultimoDatoTexto(x)) : 'Sin datos') + '</span><em>' + e.texto + '</em></button>';
+  }
+  function pintarBaterias() {
+    const texto = $('buscar').value.trim(), q = plano(texto);
+    poner('bat-filtros', botonesFiltro(filtroBat, 'data-filtro-bat'));
+    const lista = FL.filter(x => pasaFiltro(x, filtroBat) && coincide(x, q));
+    poner('bat-grupos', gruposPorZona(lista).map(z => '<section class="panel"><div class="titulo"><div class="titulo-izq"><h2>' + escapar(z.nombre) + '</h2>' + (z.demo ? marcaDemo : '') + '</div>' + suave(z.lista.length + (z.lista.length === 1 ? ' batería' : ' baterías') + (z.demo ? ' · ' + z.lista[0].modelo + ' · ' + z.lista[0].celdas.length + ' celdas' : '')) + '</div><div class="baldosas">' + z.lista.map(baldosa).join('') + '</div></section>').join('') || '<section class="panel"><div class="vacio">Ninguna batería coincide.</div></section>');
+    $('buscar-res').hidden = !q;
+    $('buscar-res').textContent = lista.length ? lista.length + (lista.length === 1 ? ' batería encontrada' : ' baterías encontradas') : 'No hay ninguna batería que coincida con «' + texto + '»';
+    return lista;
   }
 
   // --- Mapa: se carga solo al necesitarlo; si falla, el resto de la aplicación sigue funcionando ---
@@ -400,451 +1152,346 @@
   }
   const mapaNoDisponible = id => { $(id).innerHTML = '<div class="sin-mapa">No se ha podido cargar el mapa. Revisa la conexión.</div>'; };
 
-  let mapaPos = null, puntoPos = null, destinoMapa = null;
-  function posicionDestino() {
-    if (!destinoMapa) return null;
-    if (destinoMapa.demo) {
-      const b = demoPorId(destinoMapa.demo);
-      return { lat: b.lat, lon: b.lon, titulo: b.id, nota: 'Ubicación inventada para la DEMO · ' + coordenadas(b), color: colorNivel(evaluar(b).nivel), demo: true };
-    }
-    const { d } = datosReal(destinoMapa.real);
-    const titulo = tituloReal(destinoMapa.real);
-    if (!d || d.lat === undefined) return { titulo, vacio: true };
-    const vivo = conectado(d) && d.fix;
-    const nota = vivo ? 'Posición actual · ' + coordenadas(d) : 'Última posición conocida · ' + coordenadas(d) + ' · Último dato de la placa ' + ultimoDato(d);
-    return { lat: d.lat, lon: d.lon, titulo, nota, color: vivo ? '#43d17f' : '#f7b23b' };
-  }
-  function pintarMapa() {
-    const p = posicionDestino();
-    if (!p) return;
-    $('mapa-titulo').textContent = p.titulo;
-    $('mapa-demo').hidden = !p.demo;
-    $('mapa-vacio').hidden = !p.vacio;
-    $('mapa-pos').hidden = !!p.vacio;
-    $('mapa-google').hidden = !!p.vacio;
-    $('mapa-nota').textContent = p.nota || '';
-    if (p.vacio) {
-      $('mapa-vacio').textContent = 'Esta batería todavía no ha enviado ninguna posición. Aparecerá aquí cuando su GPS consiga una lectura.';
-      return;
-    }
-    $('mapa-google').href = 'https://www.google.com/maps?q=' + p.lat.toFixed(5) + ',' + p.lon.toFixed(5);
-    cargarLeaflet().then(L => {
-      const nuevo = !mapaPos;
-      if (nuevo) mapaPos = crearMapa(L, 'mapa-pos');
-      mapaPos.invalidateSize();
-      if (!puntoPos) puntoPos = L.circleMarker([p.lat, p.lon], { radius: 10, weight: 3, color: '#fff', fillOpacity: 1 }).addTo(mapaPos);
-      puntoPos.setLatLng([p.lat, p.lon]).setStyle({ fillColor: p.color });
-      if (nuevo || destinoMapa.centrar) { mapaPos.setView([p.lat, p.lon], 16); destinoMapa.centrar = false; }
-    }).catch(() => mapaNoDisponible('mapa-pos'));
-  }
-
-  // --- DEMO: todo se simula aquí mismo y no se escribe nada ---
-  const AVISO_V = 3.0, CRITICO_V = 2.8, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
-  // Cada nave son las cuatro esquinas de un edificio del mapa (noroeste, noreste, sureste, suroeste); solo para situar la DEMO
-  const POLIGONOS = [
-    { id: 'C', nombre: 'Polígono Paterna', modelo: 'wBMS-R24', celdas: 24, sondas: 6, n: 15, cols: 5, nave: [[39.512636, -0.44997], [39.512616, -0.449147], [39.512071, -0.449097], [39.512093, -0.449978]] },
-    { id: 'D', nombre: 'Polígono Riba-roja', modelo: 'wBMS-R32', celdas: 32, sondas: 10, n: 23, cols: 5, nave: [[39.486748, -0.531974], [39.486648, -0.530727], [39.485676, -0.530859], [39.485788, -0.532117]] },
-  ];
-  let demo = [];
-  const demoPorId = id => demo.find(b => b.id === id);
-  const azar = (a, b) => a + Math.random() * (b - a);
-  const colorNivel = n => ['#43d17f', '#f7b23b', '#ff6b6b'][n];
-  const contorno = p => [[p.lat + p.d, p.lon - 2 * p.d], [p.lat + 1.15 * p.d, p.lon + 2 * p.d], [p.lat - p.d, p.lon + 2.25 * p.d], [p.lat - 1.15 * p.d, p.lon - 1.8 * p.d]];
-
-  function crearDemo() {
-    demo = [];
-    POLIGONOS.forEach(p => {
-      const filas = Math.ceil(p.n / p.cols), [no, ne, se, so] = p.nave;
-      for (let i = 0; i < p.n; i++) {
-        const u = 0.12 + 0.76 * (i % p.cols) / (p.cols - 1), v = 0.15 + 0.7 * Math.floor(i / p.cols) / (filas - 1);
-        const enNave = k => (1 - v) * ((1 - u) * no[k] + u * ne[k]) + v * ((1 - u) * so[k] + u * se[k]);
-        demo.push({
-          id: p.id + '-' + String(i + 1).padStart(2, '0'), pol: p,
-          lat: enNave(0), lon: enNave(1),
-          soc: azar(35, 96), soh: azar(88, 99), corriente: azar(-35, 35),
-          margen: Array.from({ length: p.celdas }, () => azar(-0.008, 0.008)),
-          sondasBase: Array.from({ length: p.sondas }, () => azar(-1.5, 1.5)),
-          calor: 0, fallo: null, v: [], t: [],
-        });
-      }
-    });
-    demoPorId('C-04').fallo = { celda: 6, actual: 2.92, objetivo: 2.92 };
-    demoPorId('D-17').fallo = { celda: 11, actual: 2.74, objetivo: 2.74 };
-    demoPorId('D-09').calor = 27;
-    demo.forEach(actualizarBateria);
-  }
-
-  function actualizarBateria(b) {
-    const parada = b.v.length && evaluar(b).nivel === 2;
-    b.corriente = parada ? 0 : Math.max(-60, Math.min(60, b.corriente + azar(-2.5, 2.5)));
-    b.soc = Math.max(15, Math.min(98, b.soc + b.corriente * 0.0007));
-    const base = 3.2 + 0.0012 * b.soc + b.corriente * 0.0002;
-    b.v = b.margen.map(m => base + m + azar(-0.001, 0.001));
-    if (b.fallo) {
-      const f = b.fallo;
-      f.actual += Math.max(-0.004, Math.min(0.004, f.objetivo - f.actual));
-      b.v[f.celda] = f.actual;
-    }
-    b.t = b.sondasBase.map(m => 24 + Math.abs(b.corriente) * 0.1 + m + b.calor + azar(-0.15, 0.15));
-  }
-
-  function resumenBateria(b) {
-    const vMin = Math.min(...b.v), vMax = Math.max(...b.v);
-    return { vMin, vMax, cMin: b.v.indexOf(vMin) + 1, cMax: b.v.indexOf(vMax) + 1, tMin: Math.min(...b.t), tMax: Math.max(...b.t), total: b.v.reduce((a, v) => a + v, 0) };
-  }
-  function evaluar(b) {
-    const r = resumenBateria(b), lista = [];
-    if (r.vMin < CRITICO_V) lista.push({ nivel: 2, texto: 'Celda ' + r.cMin + ' a ' + decimal(r.vMin, 2) + ' V: por debajo de ' + decimal(CRITICO_V, 2) + ' V' });
-    else if (r.vMin < AVISO_V) lista.push({ nivel: 1, texto: 'Celda ' + r.cMin + ' a ' + decimal(r.vMin, 2) + ' V: por debajo de ' + decimal(AVISO_V, 2) + ' V' });
-    else if (r.vMax - r.vMin > DESEQ_V) lista.push({ nivel: 1, texto: 'Diferencia entre celdas de ' + Math.round((r.vMax - r.vMin) * 1000) + ' mV' });
-    if (r.tMax >= CRITICO_T) lista.push({ nivel: 2, texto: 'Temperatura de ' + decimal(r.tMax, 1) + ' ºC' });
-    else if (r.tMax >= AVISO_T) lista.push({ nivel: 1, texto: 'Temperatura de ' + decimal(r.tMax, 1) + ' ºC' });
-    return { nivel: lista.reduce((n, a) => Math.max(n, a.nivel), 0), lista };
-  }
-
-  function contar(lista) {
-    const c = [0, 0, 0];
-    lista.forEach(b => c[evaluar(b).nivel]++);
-    return c;
-  }
-  const cuentasHtml = c => '<div class="cuenta"><strong class="c-verde">' + c[0] + '</strong><small>Correctas</small></div><div class="cuenta"><strong class="c-naranja">' + c[1] + '</strong><small>Avisos</small></div><div class="cuenta"><strong class="c-rojo">' + c[2] + '</strong><small>Críticas</small></div>';
-
-  function montarPoligonos() {
-    [1, 2].forEach(n => {
-      const r = REALES[n];
-      $('pol-' + r.zona.id).innerHTML = '<div class="titulo-izq"><h2>' + r.zona.nombre + ' · 1 batería</h2></div>' +
-        '<div class="baldosas"><button class="baldosa apagada" type="button" data-bateria="' + n + '"><strong>' + r.id + '</strong><span>' + r.nombre + '</span><span data-b></span><em></em></button></div>';
-    });
-    POLIGONOS.forEach(p => {
-      $('pol-' + p.id).innerHTML = '<div class="titulo-izq"><span class="marca-demo">DEMO</span><h2>' + p.nombre + ' · ' + p.n + ' baterías</h2><span class="c-suave" style="font-size:14px">' + p.modelo + ' · ' + p.celdas + ' celdas</span></div>' +
-        '<div class="baldosas">' + demo.filter(b => b.pol === p).map(b => '<button class="baldosa n0" type="button" data-pack="' + b.id + '"><strong>' + b.id + '</strong><span data-a></span><span data-b></span><em></em></button>').join('') + '</div>';
-    });
-  }
-
-  let firmaAlarmas = null;
-  function pintarDemo() {
-    $('cuentas-inicio').innerHTML = cuentasHtml(contar(demo));
-    if (vista === 'inicio') {
-      demo.forEach(b => {
-        const el = document.querySelector('.baldosa[data-pack="' + b.id + '"]');
-        const r = resumenBateria(b), e = evaluar(b);
-        el.className = 'baldosa n' + e.nivel;
-        el.querySelector('[data-a]').textContent = 'SoC ' + Math.round(b.soc) + ' % · ' + Math.round(r.total) + ' V';
-        el.querySelector('[data-b]').textContent = 'Mín. ' + decimal(r.vMin, 2) + ' V · ' + Math.round(r.tMax) + ' ºC';
-        el.querySelector('em').textContent = ['Correcta', 'Aviso', 'Crítica'][e.nivel];
-      });
-      const alarmas = [];
-      demo.forEach(b => evaluar(b).lista.forEach(a => alarmas.push({ id: b.id, nivel: a.nivel, texto: a.texto })));
-      alarmas.sort((a, b) => b.nivel - a.nivel || a.id.localeCompare(b.id));
-      // Solo se redibuja si cambia algo, para no perder el foco ni repetir el aviso de voz
-      const firma = alarmas.map(a => a.id + a.nivel + a.texto.split(':')[0].replace(/ a .*/, '')).join('|');
-      $('n-alarmas').innerHTML = alarmas.length ? '<span class="pastilla ' + (alarmas.some(a => a.nivel === 2) ? 'no' : 'ojo') + '">' + alarmas.length + '</span>' : '<span class="pastilla si">Sin alarmas</span>';
-      if (firma !== firmaAlarmas) {
-        firmaAlarmas = firma;
-        $('lista-alarmas').innerHTML = alarmas.map(a => '<button class="alarma n' + a.nivel + '" type="button" data-pack="' + a.id + '" data-lista="1"><b>' + a.id + '</b><span></span></button>').join('');
-      }
-      $('lista-alarmas').querySelectorAll('.alarma').forEach((el, i) => { el.querySelector('span').textContent = alarmas[i].texto; });
-      pintarMarcadores();
-    }
-    if (vista === 'pack') pintarPack();
-    if (vista === 'mapa' && destinoMapa && destinoMapa.demo) pintarMapa();
-  }
-
-  function pintarPack() {
-    const b = demoPorId(actual), r = resumenBateria(b), e = evaluar(b);
-    $('pack-titulo').textContent = b.id;
-    $('pack-estado').innerHTML = '<span class="pastilla ' + ['si', 'ojo', 'no'][e.nivel] + '">' + ['CORRECTA', 'AVISO', 'CRÍTICA'][e.nivel] + '</span>';
-    $('pack-alarmas').innerHTML = e.lista.map(a => '<div class="alarma n' + a.nivel + '" style="cursor:default"><b>' + (a.nivel === 2 ? 'Crítica' : 'Aviso') + '</b><span>' + a.texto + '</span></div>').join('');
-    $('pack-alarmas').hidden = !e.lista.length;
-    $('pack-ajustes').innerHTML = fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', 'Simulado') + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(b)) + fila('Alimentación', 'Simulada');
-    const valores = {
-      tension: decimal(r.total, 1) + ' V', corriente: decimal(b.corriente, 1) + ' A', soc: Math.round(b.soc) + ' %', soh: Math.round(b.soh) + ' %',
-      vMax: decimal(r.vMax, 3) + ' V (celda ' + r.cMax + ')', vMin: '<span class="c-' + (r.vMin < CRITICO_V ? 'rojo' : r.vMin < AVISO_V ? 'naranja' : 'verde') + '">' + decimal(r.vMin, 3) + ' V (celda ' + r.cMin + ')</span>',
-      deseq: Math.round((r.vMax - r.vMin) * 1000) + ' mV', tMax: decimal(r.tMax, 1) + ' ºC', alarmas: e.lista.length,
-    };
-    $('pack-bms').innerHTML = filasBms(k => valores[k]);
-    // Las celdas se crean una vez por batería para no perder el foco al actualizar sus valores
-    const caja = $('pack-celdas');
-    if (caja.dataset.pack !== b.id) {
-      caja.dataset.pack = b.id;
-      celdaGraf = r.cMin - 1;
-      indiceGraf = null;
-      caja.innerHTML = b.v.map((v, i) => '<button class="celda" type="button" data-celda="' + i + '"><small>Celda ' + (i + 1) + '</small><span></span></button>').join('');
-    }
-    caja.querySelectorAll('.celda').forEach((el, i) => {
-      el.className = 'celda n' + (b.v[i] < CRITICO_V ? 2 : b.v[i] < AVISO_V ? 1 : 0) + (i === celdaGraf ? ' elegida' : '');
-      el.setAttribute('aria-pressed', i === celdaGraf);
-      el.querySelector('span').textContent = decimal(b.v[i], 3);
-    });
-    pintarGrafica(b);
-  }
-
-  // --- Gráfica: el histórico de la DEMO se calcula a partir de cada batería y termina en su valor actual ---
-  const RANGOS = {
-    minutos: { nombre: 'Minutos', titulo: 'Última hora', n: 60, paso: 6e4, amp: 0.006, caida: 0.5, ciclos: 2 },
-    horas: { nombre: 'Horas', titulo: 'Últimas 24 horas', n: 48, paso: 18e5, amp: 0.03, caida: 0.2, ciclos: 2 },
-    dias: { nombre: 'Días', titulo: 'Últimos 30 días', n: 60, paso: 432e5, amp: 0.045, caida: 0.06, ciclos: 8 },
-    anios: { nombre: 'Años', titulo: 'Últimos 5 años', n: 60, paso: 26298e5, amp: 0.03, caida: 0.02, ciclos: 5 },
-  };
-  let rangoGraf = 'horas', celdaGraf = 0, indiceGraf = null, puntosGraf = [], escalaGraf = null;
-  const ruido = (a, b, c) => { const x = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return x - Math.floor(x) - 0.5; };
-  const semilla = id => [...id].reduce((s, c) => s + c.charCodeAt(0), 0);
-
-  function historial(b) {
-    const R = RANGOS[rangoGraf], s = semilla(b.id) + Object.keys(RANGOS).indexOf(rangoGraf) * 13, ahora = Date.now();
-    const sanas = b.v.filter((v, j) => !b.fallo || j !== b.fallo.celda);
-    const media = sanas.reduce((a, v) => a + v, 0) / sanas.length;
-    const puntos = [];
-    for (let i = 0; i <= R.n; i++) {
-      const edad = (R.n - i) / R.n, atenuar = Math.min(1, edad * 6);
-      const ciclo = Math.sin(i / R.n * R.ciclos * 2 * Math.PI + s) * R.amp * atenuar;
-      const v = b.v.map((actual, j) => {
-        const cambio = ciclo + b.margen[j] * (rangoGraf === 'anios' ? -0.6 * edad : 0) + ruido(s, i, j) * 0.003 * atenuar;
-        if (!b.fallo || j !== b.fallo.celda) return actual + cambio;
-        // La celda que falla estaba sana hasta hace poco y baja hasta su valor de ahora
-        const t = Math.min(1, Math.max(0, 1 - (edad - R.caida / 2) / (R.caida / 2)));
-        return media + b.margen[j] + cambio + (actual - media - b.margen[j]) * t * t * (3 - 2 * t);
-      });
-      puntos.push({ hora: ahora - (R.n - i) * R.paso, celda: v[celdaGraf], max: Math.max(...v), min: Math.min(...v) });
-    }
-    return puntos;
-  }
-
-  function fechaGraf(ms, larga) {
-    const d = new Date(ms);
-    const hora = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-    if (rangoGraf === 'minutos' || rangoGraf === 'horas') return larga ? d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) + ', ' + hora : hora;
-    if (rangoGraf === 'dias') return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-    return d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
-  }
-
-  function pintarGrafica(b) {
-    const svg = $('graf-svg'), R = RANGOS[rangoGraf], ancho = svg.clientWidth || 320, alto = svg.clientHeight || 260;
-    const izq = 40, der = 58, arr = 10, aba = 24;
-    const puntos = puntosGraf = historial(b);
-    let bajo = Math.min(...puntos.map(p => p.min)), alto_v = Math.max(...puntos.map(p => p.max));
-    const lineas = [[AVISO_V, 'Aviso', '#f7b23b'], [CRITICO_V, 'Crítica', '#ff6b6b']].filter(l => bajo < l[0] + 0.1);
-    lineas.forEach(l => { bajo = Math.min(bajo, l[0]); });
-    const paso = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5].find(p => (alto_v - bajo) / p <= 4) || 1;
-    const y0 = Math.floor(bajo / paso) * paso, y1 = Math.ceil(alto_v / paso) * paso;
-    const x = i => izq + i / R.n * (ancho - izq - der), y = v => arr + (y1 - v) / (y1 - y0) * (alto - arr - aba);
-    const camino = (lista, f) => lista.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(f(p)).toFixed(1)).join('');
-    const banda = camino(puntos, p => p.max) + puntos.map((p, i) => 'L' + x(R.n - i).toFixed(1) + ' ' + y(puntos[R.n - i].min).toFixed(1)).join('') + 'Z';
-    let dibujo = '';
-    for (let v = y0; v <= y1 + paso / 2; v += paso) dibujo += '<line x1="' + izq + '" x2="' + (ancho - der) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="rgba(255,255,255,.1)"/><text x="' + (izq - 7) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + decimal(v, 2) + '</text>';
-    [0, 1 / 3, 2 / 3, 1].forEach(f => {
-      const i = Math.round(f * R.n);
-      dibujo += '<text x="' + x(i) + '" y="' + (alto - 6) + '" text-anchor="' + (f === 0 ? 'start' : f === 1 ? 'end' : 'middle') + '">' + fechaGraf(puntos[i].hora) + '</text>';
-    });
-    lineas.forEach(l => { dibujo += '<line x1="' + izq + '" x2="' + (ancho - der) + '" y1="' + y(l[0]) + '" y2="' + y(l[0]) + '" stroke="' + l[2] + '"/><text x="' + (ancho - der + 6) + '" y="' + (y(l[0]) + 4) + '">' + l[1] + '</text>'; });
-    const ultimo = puntos[R.n];
-    // La etiqueta del valor actual se aparta si pisaría el borde superior o la de un umbral
-    const yFin = y(ultimo.celda) - 7, yEtiqueta = yFin < arr + 8 || lineas.some(l => Math.abs(y(l[0]) + 4 - yFin) < 14) ? y(ultimo.celda) + 16 : yFin;
-    dibujo += '<path d="' + banda + '" fill="rgba(179,193,208,.28)"/><path d="' + camino(puntos, p => p.celda) + '" fill="none" stroke="#3d97e6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
-      '<circle cx="' + x(R.n) + '" cy="' + y(ultimo.celda) + '" r="4" fill="#3d97e6" stroke="#0f2035" stroke-width="2"/><text class="fin" x="' + (x(R.n) + 7) + '" y="' + yEtiqueta + '">' + decimal(ultimo.celda, 2) + ' V</text><g id="graf-cruz"></g>';
-    svg.setAttribute('viewBox', '0 0 ' + ancho + ' ' + alto);
-    svg.setAttribute('aria-label', 'Tensión de la celda ' + (celdaGraf + 1) + ', ' + R.titulo.toLowerCase() + '. Valor actual ' + decimal(ultimo.celda, 2) + ' voltios. Usa las flechas para recorrer los datos.');
-    svg.innerHTML = dibujo;
-    escalaGraf = { x, y, izq, ancho, der, arr, alto, aba };
-    $('graf-rangos').innerHTML = Object.keys(RANGOS).map(k => '<button type="button" data-rango="' + k + '" aria-pressed="' + (k === rangoGraf) + '">' + RANGOS[k].nombre + '</button>').join('');
-    $('graf-leyenda').innerHTML = '<span>' + R.titulo + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>';
-    if ($('graf-detalles').open) pintarTabla();
-    pintarCruz();
-  }
-
-  function pintarCruz() {
-    const cruz = $('graf-cruz'), tip = $('graf-tip'), p = puntosGraf[indiceGraf];
-    if (!cruz) return;
-    if (indiceGraf === null || !p) { cruz.innerHTML = ''; tip.hidden = true; return; }
-    const e = escalaGraf, cx = e.x(indiceGraf);
-    cruz.innerHTML = '<line x1="' + cx + '" x2="' + cx + '" y1="' + e.arr + '" y2="' + (e.alto - e.aba) + '" stroke="rgba(255,255,255,.45)"/><circle cx="' + cx + '" cy="' + e.y(p.celda) + '" r="4" fill="#3d97e6" stroke="#0f2035" stroke-width="2"/>';
-    tip.innerHTML = '<small>' + fechaGraf(p.hora, true) + '</small><div><i></i><b>' + decimal(p.celda, 3) + ' V</b><small>Celda ' + (celdaGraf + 1) + '</small></div><div><i class="banda"></i><b>' + decimal(p.max, 3) + ' V</b><small>Más alta</small></div><div><i class="banda"></i><b>' + decimal(p.min, 3) + ' V</b><small>Más baja</small></div>';
-    tip.hidden = false;
-    const hueco = tip.offsetWidth + 12;
-    tip.style.left = (cx + hueco > e.ancho ? Math.max(0, cx - hueco) : cx + 12) + 'px';
-  }
-
-  function pintarTabla() {
-    $('graf-tabla').innerHTML = '<table><thead><tr><th scope="col">Fecha</th><th scope="col">Celda ' + (celdaGraf + 1) + '</th><th scope="col">Más alta</th><th scope="col">Más baja</th></tr></thead><tbody>' +
-      puntosGraf.slice().reverse().map(p => '<tr><td>' + fechaGraf(p.hora, true) + '</td><td>' + decimal(p.celda, 3) + ' V</td><td>' + decimal(p.max, 3) + ' V</td><td>' + decimal(p.min, 3) + ' V</td></tr>').join('') + '</tbody></table>';
-  }
-
   const ZOOM_BATERIAS = 17;
-  let mapaParque = null, encuadrarParque = null;
-  const marcadores = {}, marcadoresReales = {}, resumenesNave = {};
-  const iconoNave = (p, nivel) => L.divIcon({ className: 'nave-resumen nv' + nivel, html: String(p.n), iconSize: [34, 34] });
+  let mapa = null, zonasMapa = [], navesMapa = {}, capaPuntos = null, capaResumen = null, capaReales = null, anchoMapa = 0, filtroMapa = 'todos', elegido = null, centrarEn = null;
+  const marcadores = {}, resumenesNave = {};
+  const iconoNave = (n, nivel) => L.divIcon({ className: 'nave-resumen nv' + nivel, html: String(n), iconSize: [34, 34] });
+  function contenidoPopup(x) {
+    const nivelBat = socTexto(x) || (x.tension !== null ? decimal(x.tension, x.tension > 30 ? 1 : 2) + ' V' : 'Sin datos');
+    return '<b>' + nombreConMarca(x) + '</b><br>' + escapar(x.nombre) + '<br>' + pastillaDe(x) + '<br>Última comunicación: ' + (x.ultimaMs ? (x.conectado ? 'ahora' : ultimoDatoTexto(x)) : 'sin datos') + '<br>Batería: ' + nivelBat + '<br><button class="boton" type="button" data-ficha="' + x.id + '">Abrir ficha</button>';
+  }
+  function marcadorDe(x, radio) {
+    if (marcadores[x.id]) return marcadores[x.id];
+    const m = L.circleMarker([x.lat, x.lon], { radius: radio, weight: 2, color: '#fff', fillOpacity: 1, fillColor: COLOR_MARCA.off });
+    m.bindTooltip(x.id).bindPopup(() => { const a = dispPorId(x.id); return a ? contenidoPopup(a) : ''; });
+    marcadores[x.id] = m;
+    return m;
+  }
+  function verCapas() {
+    if (!mapa || !capaPuntos) return;
+    const cerca = mapa.getZoom() >= ZOOM_BATERIAS;
+    (cerca ? capaResumen : capaPuntos).remove();
+    if (modoDemo) (cerca ? capaPuntos : capaResumen).addTo(mapa);
+    else (cerca ? capaPuntos : capaResumen).remove();
+  }
+  function encuadrarMapa() {
+    if (!mapa) return;
+    const capas = zonasMapa.concat(modoDemo ? Object.values(navesMapa) : []);
+    FL.forEach(x => { if (x.real && x.lat !== null && marcadores[x.id]) capas.push(marcadores[x.id]); });
+    mapa.fitBounds(L.featureGroup(capas).getBounds(), { padding: [24, 24] });
+  }
+  function montarDemoEnMapa() {
+    Object.values(navesMapa).forEach(n => n.remove());
+    navesMapa = {};
+    if (capaPuntos) capaPuntos.clearLayers();
+    if (capaResumen) capaResumen.clearLayers();
+    Object.keys(marcadores).forEach(k => { if (!FLOTA.some(c => c.id === k)) delete marcadores[k]; });
+    Object.keys(resumenesNave).forEach(k => delete resumenesNave[k]);
+    if (modoDemo) POLIGONOS.forEach(p => {
+      const nave = L.polygon(p.nave, { color: '#ffa62b', weight: 2, fillOpacity: 0.12 }).bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)', { direction: 'top' }).addTo(mapa);
+      navesMapa[p.id] = nave;
+      const m = L.marker(nave.getBounds().getCenter(), { icon: iconoNave(p.n, 0), alt: p.nombre + ', ' + p.n + ' baterías' })
+        .bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)', { direction: 'top', offset: [0, -14] })
+        .on('click', () => mapa.fitBounds(nave.getBounds(), { padding: [20, 20], maxZoom: 18 }));
+      m.clave = ''; m.addTo(capaResumen);
+      resumenesNave[p.id] = m;
+    });
+    verCapas();
+    pintarMarcadores();
+  }
+  // De lejos no caben las baterías dentro de la nave: se ve un solo círculo con el total y el peor estado
   function pintarMarcadores() {
-    demo.forEach(b => { if (marcadores[b.id]) marcadores[b.id].setStyle({ fillColor: colorNivel(evaluar(b).nivel) }); });
+    if (!mapa) return;
+    FL.forEach(x => {
+      if (x.lat === null) { if (marcadores[x.id]) marcadores[x.id].remove(); return; }
+      const m = marcadorDe(x, x.real ? 9 : 6), capa = x.real ? capaReales : capaPuntos, ver = pasaFiltro(x, filtroMapa);
+      m.setLatLng([x.lat, x.lon]);
+      if (ver && !capa.hasLayer(m)) capa.addLayer(m);
+      if (!ver && capa.hasLayer(m)) capa.removeLayer(m);
+      if (capa === capaReales || mapa.hasLayer(m)) m.setStyle({ fillColor: COLOR_MARCA[estadoDe(x).marca] });
+      else m.options.fillColor = COLOR_MARCA[estadoDe(x).marca];
+      if (m.isPopupOpen && m.isPopupOpen()) m.setPopupContent(contenidoPopup(x));
+    });
     POLIGONOS.forEach(p => {
       const m = resumenesNave[p.id];
       if (!m) return;
-      const nivel = Math.max(...demo.filter(b => b.pol === p).map(b => evaluar(b).nivel));
-      if (nivel !== m.nivel) { m.nivel = nivel; m.setIcon(iconoNave(p, nivel)); }
+      const lista = FL.filter(x => !x.real && x.zona === p.nombre && pasaFiltro(x, filtroMapa));
+      const nivel = lista.length ? Math.max(...lista.map(x => nivelDe(x.alarmas))) : 0, clave = lista.length + '|' + nivel;
+      if (clave !== m.clave) { m.clave = clave; m.setIcon(iconoNave(lista.length, nivel)); }
+      m.setOpacity(lista.length ? 1 : 0);
     });
   }
-  function pintarMarcadoresReales() {
-    if (!mapaParque) return;
-    [1, 2].forEach(n => {
-      const { d } = datosReal(n);
-      if (!d || d.lat === undefined) return;
-      const nuevo = !marcadoresReales[n];
-      if (nuevo) marcadoresReales[n] = L.circleMarker([d.lat, d.lon], { radius: 9, weight: 2.5, color: '#fff', fillOpacity: 1 }).bindTooltip(REALES[n].id + ' · ' + REALES[n].nombre).on('click', () => ir('bateria', n)).addTo(mapaParque);
-      marcadoresReales[n].setLatLng([d.lat, d.lon]).setStyle({ fillColor: conectado(d) ? '#62bcff' : '#8796a6' });
-      if (nuevo) encuadrarParque();
-    });
+  function pintarMapa() {
+    poner('mapa-filtros', botonesFiltro(filtroMapa, 'data-filtro-mapa'));
+    const x = elegido ? dispPorId(elegido) : null;
+    if (x) {
+      const nota = x.lat === null ? 'Esta batería todavía no ha enviado ninguna posición. Aparecerá aquí cuando su GPS consiga una lectura.' :
+        !x.real ? 'Ubicación inventada para la DEMO · ' + coordenadas(x) :
+        x.conectado && x.d.fix ? 'Posición actual · ' + coordenadas(x) : 'Última posición conocida · ' + coordenadas(x) + ' · Último dato de la placa ' + ultimoDatoTexto(x);
+      poner('mapa-elegido', '<div class="barra-mapa"><span><b>' + nombreConMarca(x) + '</b> · ' + nota + '</span><span class="acciones"><button class="boton" type="button" data-ficha="' + x.id + '">Abrir ficha</button>' + (x.lat !== null ? '<a class="boton" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + x.lat.toFixed(5) + ',' + x.lon.toFixed(5) + '">Abrir en Google Maps</a>' : '') + '</span></div>');
+    } else poner('mapa-elegido', '');
+    const sinPos = FL.filter(n => n.lat === null && pasaFiltro(n, filtroMapa));
+    poner('mapa-sinpos', sinPos.length ? '<p class="pista">Sin posición GPS, no aparecen en el mapa: ' + sinPos.map(n => '<button class="boton" style="min-height:32px;padding:2px 9px;margin:2px 3px" type="button" data-ficha="' + n.id + '">' + escapar(n.id) + '</button>').join('') + '</p>' : '');
+    pintarMarcadores();
   }
-  function montarMapaParque() {
+  function montarMapa() {
     cargarLeaflet().then(L => {
-      if (vista !== 'inicio') return;
-      if (mapaParque) { mapaParque.invalidateSize(); return; }
-      mapaParque = crearMapa(L, 'mapa-parque');
-      // Las zonas de Canet y Sagunto son aproximadas: la batería real sale donde diga su GPS
-      const zonas = [1, 2].map(n => L.polygon(contorno(REALES[n].zona), { color: '#62bcff', weight: 2, fillOpacity: 0.14 }).bindTooltip(REALES[n].zona.nombre + ' · zona aproximada', { direction: 'top' }).addTo(mapaParque));
-      const naves = POLIGONOS.map(p => L.polygon(p.nave, { color: '#f7b23b', weight: 2, fillOpacity: 0.12 }).bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)', { direction: 'top' }).addTo(mapaParque));
-      const capaPuntos = L.layerGroup(), capaResumen = L.layerGroup();
-      POLIGONOS.forEach((p, i) => {
-        const nivel = Math.max(...demo.filter(b => b.pol === p).map(b => evaluar(b).nivel));
-        resumenesNave[p.id] = L.marker(naves[i].getBounds().getCenter(), { icon: iconoNave(p, nivel), alt: p.nombre + ', ' + p.n + ' baterías' })
-          .bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)', { direction: 'top', offset: [0, -14] })
-          .on('click', () => mapaParque.fitBounds(naves[i].getBounds(), { padding: [20, 20], maxZoom: 18 })).addTo(capaResumen);
-        resumenesNave[p.id].nivel = nivel;
-      });
-      demo.forEach(b => {
-        marcadores[b.id] = L.circleMarker([b.lat, b.lon], { radius: 6, weight: 1.5, color: '#fff', fillOpacity: 1, fillColor: colorNivel(evaluar(b).nivel) }).bindTooltip(b.id).on('click', () => ir('pack', b.id)).addTo(capaPuntos);
-      });
-      // De lejos no caben las baterías dentro de la nave: se ve un solo círculo con el total y el peor estado
-      const verCapas = () => {
-        const cerca = mapaParque.getZoom() >= ZOOM_BATERIAS;
-        (cerca ? capaResumen : capaPuntos).remove();
-        (cerca ? capaPuntos : capaResumen).addTo(mapaParque);
-      };
-      encuadrarParque = () => mapaParque.fitBounds(L.featureGroup(zonas.concat(naves, Object.values(marcadoresReales))).getBounds(), { padding: [24, 24] });
-      encuadrarParque();
-      verCapas();
-      mapaParque.on('zoomend', verCapas);   // después del primer encuadre, cuando el mapa ya puede dibujar círculos
-      mapaParque.on('resize', encuadrarParque);   // al girar el móvil siguen viéndose todos los polígonos
-      pintarMarcadoresReales();
-    }).catch(() => mapaNoDisponible('mapa-parque'));
+      if (vista !== 'mapa') return;
+      if (!mapa) {
+        mapa = crearMapa(L, 'mapa');
+        // Las zonas de Canet y Sagunto son aproximadas: la batería real sale donde diga su GPS
+        zonasMapa = FLOTA.map(c => L.polygon(contorno(c.zona), { color: '#2fd6d6', weight: 2, fillOpacity: 0.12 }).bindTooltip(c.zona.nombre + ' · zona aproximada', { direction: 'top' }).addTo(mapa));
+        capaPuntos = L.layerGroup(); capaResumen = L.layerGroup(); capaReales = L.layerGroup().addTo(mapa);
+        anchoMapa = $('mapa').clientWidth;
+        mapa.fitBounds(L.featureGroup(zonasMapa).getBounds());
+        montarDemoEnMapa();
+        pintarMarcadores();
+        encuadrarMapa();
+        verCapas();
+        mapa.on('zoomend', verCapas);   // después del primer encuadre, cuando el mapa ya puede dibujar círculos
+        // Al girar el móvil siguen viéndose todos los polígonos; ocultar la barra del navegador no mueve nada
+        mapa.on('resize', () => { const a = $('mapa').clientWidth; if (a !== anchoMapa) { anchoMapa = a; if (!elegido) encuadrarMapa(); } });
+      } else mapa.invalidateSize();
+      pintarMapa();
+      if (centrarEn) {
+        const x = dispPorId(centrarEn);
+        if (x && x.lat !== null) { mapa.setView([x.lat, x.lon], x.real ? 16 : 18); if (marcadores[x.id] && mapa.hasLayer(marcadores[x.id])) marcadores[x.id].openPopup(); }
+        centrarEn = null;
+      }
+    }).catch(() => mapaNoDisponible('mapa'));
+  }
+
+  // Comunicaciones
+  function pintarComunicaciones() {
+    const red = estadoRed(), emisores = FL.filter(x => x.real || modoDemo), reales = FL.filter(x => x.real), u = ultimaRecepcionReal();
+    const estaciones = reales.map(x => ({ x, activa: !!(x.d && x.d.wifi_hora && Date.now() - x.d.wifi_hora < CONECTADO_MS) }));
+    const callados = emisores.filter(x => !x.conectado && x.ultimaMs).length;
+    poner('com-kpis',
+      kpi('comunicaciones', 'Red LoRa', red.texto, red.sub, red.tono, 'comunicaciones') +
+      kpi('ok', 'Emisores activos', emisores.filter(x => x.conectado).length + ' / ' + emisores.length, modoDemo ? 'Incluye DEMO' : 'Placas transmitiendo', 't-verde', 'baterias') +
+      kpi('mapa', 'Estaciones activas', estaciones.filter(e => e.activa).length + ' / ' + estaciones.length, 'Subiendo a internet', 't-lora', 'comunicaciones') +
+      kpi('corte', 'Dejaron de transmitir', callados, u ? 'Último paquete ' + hace(Date.now() - u.ultimaMs) : 'Sin paquetes aún', callados ? 't-rojo' : 't-gris', 'alarmas'));
+    const lista = emisores.slice(0, 200);
+    poner('com-emisores', '<table><thead><tr><th scope="col">Dispositivo</th><th scope="col">Estado</th><th scope="col">Último paquete</th><th scope="col">RSSI</th><th scope="col">SNR</th></tr></thead><tbody>' + lista.map(x =>
+      '<tr data-ficha="' + x.id + '"><td>' + nombreConMarca(x) + (x.real ? ' ' + suave(escapar(x.nombre)) : '') + '</td><td>' + (x.conectado ? '<span class="pastilla si">EMITE</span>' : x.ultimaMs ? '<span class="pastilla no">CALLADO</span>' : '<span class="pastilla gris">SIN DATOS</span>') + '</td><td>' + (x.ultimaMs ? (x.conectado && !x.real ? 'ahora' : ultimoDatoTexto(x)) : '—') + '</td><td class="c-lora">' + (x.rssi ? x.rssi + ' dB' : '—') + '</td><td>' + (x.snr !== null && x.snr !== undefined ? decimal(x.snr, 1) + ' dB' : suave('No lo envía')) + '</td></tr>').join('') + '</tbody></table>');
+    poner('com-estaciones', '<table><thead><tr><th scope="col">Estación</th><th scope="col">Estado</th><th scope="col">Oye a</th><th scope="col">RSSI LoRa</th><th scope="col">Wi-Fi</th><th scope="col">Última subida</th></tr></thead><tbody>' + estaciones.map(e => {
+      const d = e.x.d, oido = d && d.rssi_lora && e.x.conectado;
+      return '<tr><td>Placa de ' + escapar(e.x.id) + '</td><td>' + (e.activa ? '<span class="pastilla lora">ACTIVA</span>' : '<span class="pastilla gris">INACTIVA</span>') + '</td><td>' + escapar((FLOTA.find(c => c.nodo === e.x.c.otro) || {}).id || '—') + '</td><td class="c-lora">' + (oido ? d.rssi_lora + ' dB' : '—') + '</td><td>' + (d && d.wifi_red ? escapar(d.wifi_red) + (e.activa ? rayas(rayasWifi(d.rssi_wifi)) : '') : '—') + '</td><td>' + (d && d.wifi_hora ? hace(Date.now() - d.wifi_hora) : '—') + '</td></tr>';
+    }).join('') + '</tbody></table>');
+    const pq = recientes.slice(0, 40);
+    poner('com-paquetes', pq.length ? '<table><thead><tr><th scope="col">Fecha</th><th scope="col">Dispositivo</th><th scope="col">Ruta</th><th scope="col">RSSI</th><th scope="col">SNR</th><th scope="col">GPS</th></tr></thead><tbody>' + pq.map(p => '<tr><td>' + fechaHora(p.t) + '</td><td>' + escapar(p.dev) + '</td><td>' + escapar(p.ruta || '—') + '</td><td class="c-lora">' + (p.rssi ? p.rssi + ' dB' : '—') + '</td><td>' + (p.snr !== null && p.snr !== undefined ? decimal(p.snr, 1) + ' dB' : '—') + '</td><td>' + (p.fix ? p.sats + ' sat.' : 'Sin fijar') + '</td></tr>').join('') + '</tbody></table>' : '<div class="vacio">Aún no ha llegado ningún paquete desde que la aplicación está abierta en este dispositivo.</div>');
+  }
+
+  // Gráficas
+  const METRICAS = [
+    { k: 'tension', titulo: 'Evolución de tensión', unidad: 'V', dec: 2, minimo: 0.1, sinDatos: 'Sin datos de tensión en este periodo. Aparecerán al conectar el BMS o el sensor.' },
+    { k: 'soc', titulo: 'Evolución de carga', unidad: '%', dec: 0, minimo: 5, sinDatos: 'Sin datos de carga: el BMS no está conectado.' },
+    { k: 'temp', titulo: 'Temperatura', unidad: 'ºC', dec: 1, minimo: 2, sinDatos: 'Sin datos de temperatura: el BMS no está conectado.' },
+    { k: 'rssi', titulo: 'Calidad de señal LoRa (RSSI)', unidad: 'dB', dec: 0, minimo: 5, lora: true, sinDatos: 'Sin paquetes LoRa registrados en este periodo.' },
+    { k: 'placa', titulo: 'Alimentación de la placa', unidad: 'V', dec: 2, minimo: 0.1, soloReal: true, sinDatos: 'Sin datos de alimentación en este periodo.' },
+  ];
+  let grDisp = null, grRango = 'horas', grTok = 0, grafs = {}, grMontado = false;
+  function montarGraficas() {
+    if (grMontado) return;
+    grMontado = true;
+    $('gr-caja').innerHTML = METRICAS.concat([{ k: 'desc', titulo: 'Historial de desconexiones' }]).map(m => '<section class="panel" id="gr-p-' + m.k + '"><div class="titulo"><h2>' + m.titulo + '</h2></div><div id="gr-' + m.k + '"></div></section>').join('');
+    METRICAS.concat([{ k: 'desc' }]).forEach(m => { grafs[m.k] = crearGrafica($('gr-' + m.k)); });
+  }
+  async function pintarGraficas() {
+    montarGraficas();
+    const opciones = FL.map(x => '<option value="' + x.id + '">' + escapar(x.id) + ' · ' + escapar(x.nombre) + (x.real ? '' : ' (DEMO)') + '</option>').join('');
+    if ($('gr-disp').dataset.html !== opciones) { $('gr-disp').dataset.html = opciones; $('gr-disp').innerHTML = opciones; }
+    if (!grDisp || !dispPorId(grDisp)) grDisp = FL[0].id;
+    $('gr-disp').value = grDisp;
+    poner('gr-rangos', botonesRango(grRango, 'data-gr-rango'));
+    const x = dispPorId(grDisp), R = RANGOS[grRango], hasta = Date.now(), desde = hasta - R.ms, tok = ++grTok;
+    poner('gr-nota', x.real ? 'Datos reales de ' + escapar(x.id) + '. Firebase solo guarda el último valor: el histórico se acumula en este dispositivo mientras la aplicación está abierta' + (guardadoDesde ? ', desde el ' + new Date(guardadoDesde).toLocaleDateString('es-ES') + '.' : '.') : marcaDemo + ' Histórico simulado de ' + escapar(x.id) + ', no son medidas reales.');
+    const filas = x.real ? await leerFilas(R.tabla, x.id, desde) : null;
+    if (tok !== grTok) return;
+    const finas = filas ? reducir(filas, 300) : null;
+    METRICAS.forEach(m => {
+      $('gr-p-' + m.k).hidden = !!m.soloReal && !x.real;
+      if (m.soloReal && !x.real) return;
+      const puntos = x.real ? finas.filter(f => f[m.k] !== null && f[m.k] !== undefined).map(f => ({ t: f.t, v: f[m.k] })) : serieDemo(x, m.k, grRango);
+      const umbrales = m.k === 'temp' ? [[AVISO_T, 'Aviso', 'u-naranja'], [CRITICO_T, 'Crítica', 'u-rojo']] : [];
+      grafs[m.k].pintar({ puntos, desde, hasta, rango: grRango, hueco: x.real ? R.hueco : Infinity, unidad: m.unidad, dec: m.dec, nombre: m.titulo, minimo: m.minimo, lora: m.lora, umbrales, vacio: m.sinDatos });
+    });
+    const cubos = Math.round(R.ms / R.barra), barras = [];
+    for (let i = 0; i < cubos; i++) barras.push({ t: desde + (i + 0.5) * R.barra, v: 0 });
+    let hayDesc = false;
+    incidencias.forEach(i => {
+      if (i.dev !== x.id || i.t < desde) return;
+      // Un mismo corte que pasa de aviso a crítica cuenta una sola vez
+      const escalada = i.tipo === 'comunicacion' && incidencias.some(n => n.dev === i.dev && n.tipo === 'desconectado' && n.fin && Math.abs(n.fin - i.t) < 5000);
+      if ((i.tipo !== 'desconectado' && i.tipo !== 'comunicacion') || escalada) return;
+      const c = barras[Math.min(cubos - 1, Math.floor((i.t - desde) / R.barra))];
+      if (c) { c.v++; hayDesc = true; }
+    });
+    grafs.desc.pintar({ puntos: hayDesc ? barras : [], desde, hasta, rango: grRango, barras: true, unidad: 'cortes', dec: 0, nombre: 'Desconexiones', minimo: 1, vacio: 'Sin desconexiones registradas en este periodo.' });
+  }
+
+  // Alarmas
+  let modoAlarmas = 'activas';
+  function pintarAlarmas() {
+    const activas = alarmasActivas(), crit = activas.filter(a => a.nivel === 2).length, av = activas.length - crit, hist = incidencias.slice().reverse();
+    poner('al-modos', [['activas', 'Activas'], ['historico', 'Histórico']].map(m => '<button type="button" data-modo-alarmas="' + m[0] + '" aria-pressed="' + (m[0] === modoAlarmas) + '">' + m[1] + '</button>').join(''));
+    poner('al-kpis',
+      kpi('aviso', 'Críticas', crit, 'Atención inmediata', crit ? 't-rojo' : 't-gris', 'alarmas') +
+      kpi('aviso', 'Avisos', av, 'A vigilar', av ? 't-naranja' : 't-gris', 'alarmas') +
+      kpi('reloj', 'Incidencias', hist.length, 'En el histórico', 't-gris', 'alarmas') +
+      kpi('ok', 'Sin alarmas', FL.filter(x => !x.alarmas.length).length, 'Baterías correctas', 't-verde', 'baterias'));
+    if (modoAlarmas === 'activas') {
+      poner('al-lista', activas.length ? '<div class="alarmas">' + activas.map(filaAlarma).join('') + '</div>' : '<div class="vacio">Sin alarmas activas.</div>');
+      return;
+    }
+    poner('al-lista', hist.length ? '<div class="tabla-marco"><table><thead><tr><th scope="col">Fecha</th><th scope="col">Dispositivo</th><th scope="col">Nivel</th><th scope="col">Motivo</th><th scope="col">Duración</th></tr></thead><tbody>' + hist.slice(0, 200).map(i => {
+      const dur = (i.fin || Date.now()) - i.t;
+      return '<tr' + (dispPorId(i.dev) ? ' data-ficha="' + escapar(i.dev) + '"' : '') + '><td>' + fechaHora(i.t) + '</td><td>' + escapar(i.dev) + (i.demo ? ' ' + marcaDemo : '') + '</td><td><span class="pastilla ' + (i.nivel === 2 ? 'no' : 'ojo') + '">' + (i.nivel === 2 ? 'CRÍTICA' : 'AVISO') + '</span></td><td class="partir">' + (NOMBRES_TIPO[i.tipo] || '') + '<br>' + suave(escapar(i.motivo)) + '</td><td>' + (i.fin ? hace(dur).replace('hace ', '') : '<span class="c-rojo">Activa</span>') + '</td></tr>';
+    }).join('') + '</tbody></table></div><p class="pista">Se registra en este dispositivo mientras la aplicación está abierta.</p>' : '<div class="vacio">Sin incidencias registradas.</div>');
+  }
+
+  // Ajustes
+  function pintarAjustes() {
+    poner('aj-baterias', FL.filter(x => x.real).map(x => '<button class="zona-fila" type="button" data-ficha="' + x.id + '"><span><b>' + escapar(x.id) + ' · ' + escapar(x.nombre) + '</b><br>' + suave(escapar(x.zona)) + '</span>' + pastillaDe(x) + '</button>').join(''));
+    poner('aj-enlace', fila('Base de datos', HAY_CLAVE ? (sinInternet ? '<span class="c-rojo">Sin conexión</span>' : ultimo ? '<span class="c-verde">Conectada</span>' : 'Conectando…') : suave('Falta tu enlace completo')) + fila('Actualización', HAY_CLAVE ? (enVivo ? 'En directo' : 'Lectura cada 2 s') : '—') + fila('Las placas envían cada', '20 s') + fila('No conectado tras', '35 s sin datos') + fila('Permisos', 'Solo lectura'));
+    poner('aj-datos', fila('Paquetes (última semana)', bd ? recientes.length : suave('Solo esta sesión')) + fila('Incidencias', incidencias.filter(i => !i.demo).length) + fila('Registrando desde', guardadoDesde ? new Date(guardadoDesde).toLocaleDateString('es-ES') : suave('Hoy')));
+    $('aj-demo').setAttribute('aria-checked', String(modoDemo));
+    poner('aj-demo-acciones', modoDemo ? '<button class="boton" type="button" data-demo-fallo>Simular bajada de celda</button><button class="boton" type="button" data-demo-corte>Simular corte de comunicación</button><button class="boton" type="button" data-demo-reiniciar>Reiniciar</button>' : '');
+    const tema = memoria.leer('tema') === 'claro' ? 'claro' : 'oscuro';
+    poner('aj-tema', [['oscuro', 'Oscuro'], ['claro', 'Claro']].map(t => '<button type="button" data-tema="' + t[0] + '" aria-pressed="' + (t[0] === tema) + '">' + t[1] + '</button>').join(''));
+    poner('aj-umbrales', fila('Celda, aviso bajo', '&lt; ' + decimal(AVISO_V, 2) + ' V') + fila('Celda, crítica baja', '&lt; ' + decimal(CRITICO_V, 2) + ' V') + fila('Celda, aviso alto', '≥ ' + decimal(AVISO_V_ALTA, 2) + ' V') + fila('Celda, crítica alta', '≥ ' + decimal(CRITICO_V_ALTA, 2) + ' V') + fila('Desequilibrio', '&gt; ' + Math.round(DESEQ_V * 1000) + ' mV') + fila('Temperatura', decimal(AVISO_T, 0) + ' / ' + decimal(CRITICO_T, 0) + ' ºC') + fila('Batería auxiliar 12 V', decimal(AUX_CRITICO, 1) + ' – ' + decimal(AUX_ALTA, 1) + ' V') + fila('Pérdida de comunicación', '10 min sin datos'));
+  }
+  function ponerTema(t) {
+    if (t === 'claro') document.documentElement.dataset.tema = 'claro'; else delete document.documentElement.dataset.tema;
+    memoria.guardar('tema', t);
+    document.querySelector('meta[name="theme-color"]').content = t === 'claro' ? '#ffffff' : '#070f1c';
   }
 
   // --- Navegación: el # guarda la clave, así que las pantallas se recuerdan sin tocar la dirección ---
-  const VISTAS = ['inicio', 'bateria', 'mapa', 'pack'];
-  let alturaInicio = 0;
+  const SECCIONES = [['inicio', 'Inicio'], ['mapa', 'Mapa'], ['baterias', 'Baterías'], ['comunicaciones', 'Comunicaciones', 'Comunic.'], ['graficas', 'Gráficas'], ['alarmas', 'Alarmas'], ['ajustes', 'Ajustes']];
+  const VISTAS = SECCIONES.map(s => s[0]).concat('ficha');
+  const alturas = {};
+  $('nav').innerHTML = SECCIONES.map(s => '<button type="button" data-ir="' + s[0] + '" aria-label="' + s[1] + '">' + icono(s[0]) + '<span class="largo">' + s[1] + '</span><span class="corto">' + (s[2] || s[1]) + '</span><span class="globo" hidden></span></button>').join('');
+  function pintarNav() {
+    const activa = vista === 'ficha' ? 'baterias' : vista;
+    document.querySelectorAll('#nav button').forEach(b => { if (b.dataset.ir === activa) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    const n = FL.reduce((a, x) => a + x.alarmas.length, 0), g = document.querySelector('#nav [data-ir="alarmas"] .globo');
+    g.hidden = !n; g.textContent = n > 99 ? '99+' : n;
+  }
+  function pintarVista() {
+    pintarNav();
+    $('aviso-demo').hidden = !modoDemo;
+    if (vista === 'inicio') pintarInicio();
+    else if (vista === 'mapa') pintarMapa();
+    else if (vista === 'baterias') pintarBaterias();
+    else if (vista === 'ficha') pintarFicha();
+    else if (vista === 'comunicaciones') pintarComunicaciones();
+    else if (vista === 'alarmas') pintarAlarmas();
+    else if (vista === 'ajustes') pintarAjustes();
+    else if (vista === 'graficas' && (hayNuevo || !grMontado || (Date.now() - ultimaCarga > 5000))) { hayNuevo = false; ultimaCarga = Date.now(); pintarGraficas(); }
+  }
+  function refrescar() { recalcular(); pintarVista(); }
   function mostrar(v, id, dest) {
-    if (vista === 'inicio') alturaInicio = window.scrollY;
-    vista = v; actual = id;
-    if (v === 'mapa') destinoMapa = Object.assign({ centrar: true }, dest);
+    alturas[vista] = window.scrollY;
+    vista = v; actual = id === undefined ? null : id;
     VISTAS.forEach(n => { $('v-' + n).hidden = n !== v; });
-    window.scrollTo(0, 0);
-    if (v === 'bateria') pintarDetalle();
-    if (v === 'mapa') pintarMapa();
-    if (v === 'inicio') { firmaAlarmas = null; pintarDemo(); montarMapaParque(); window.scrollTo(0, alturaInicio); }
-    if (v === 'pack') pintarPack();
+    if (v === 'mapa') {
+      elegido = dest && dest.id ? dest.id : null;
+      centrarEn = elegido;
+      montarMapa();
+    }
+    if (v === 'ficha') { tokenCelda++; celdasDe = null; }
+    if (v === 'graficas') ultimaCarga = 0;
+    pintarVista();
+    window.scrollTo(0, v === 'ficha' ? 0 : alturas[v] || 0);
   }
   function ir(v, id, dest) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (mapa && v !== 'mapa') mapa.closePopup();
     history.pushState({ v, id, dest }, '');
     mostrar(v, id, dest);
   }
-  window.addEventListener('popstate', ev => { const s = ev.state || { v: 'inicio' }; mostrar(s.v, s.id, s.dest); });
-
-  const grafSvg = $('graf-svg');
-  grafSvg.addEventListener('pointermove', ev => {
-    if (!escalaGraf) return;
-    const caja = grafSvg.getBoundingClientRect(), e = escalaGraf, n = puntosGraf.length - 1;
-    indiceGraf = Math.max(0, Math.min(n, Math.round((ev.clientX - caja.left - e.izq) / (e.ancho - e.izq - e.der) * n)));
-    pintarCruz();
+  window.addEventListener('popstate', ev => {
+    const s = ev.state || { v: 'inicio' };
+    if (s.v === 'ficha' && !FLOTA.some(c => c.id === s.id) && !modoDemo) { mostrar('inicio'); return; }
+    mostrar(s.v, s.id, s.dest);
   });
-  grafSvg.addEventListener('pointerleave', () => { indiceGraf = null; pintarCruz(); });
-  grafSvg.addEventListener('blur', () => { indiceGraf = null; pintarCruz(); });
-  grafSvg.addEventListener('keydown', ev => {
-    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
-    ev.preventDefault();
-    const n = puntosGraf.length - 1, base = indiceGraf === null ? n : indiceGraf;
-    indiceGraf = Math.max(0, Math.min(n, base + (ev.key === 'ArrowLeft' ? -1 : 1)));
-    pintarCruz();
-  });
-  $('graf-detalles').addEventListener('toggle', () => { if ($('graf-detalles').open) pintarTabla(); });
-  window.addEventListener('resize', () => { if (vista === 'pack') pintarGrafica(demoPorId(actual)); });
 
   document.addEventListener('click', ev => {
-    const el = ev.target.closest('[data-volver],[data-bateria],[data-pack],[data-rango],[data-celda]');
+    const el = ev.target.closest('[data-volver],[data-ir],[data-ficha],[data-rango],[data-celda],[data-gr-rango],[data-filtro-bat],[data-filtro-mapa],[data-modo-alarmas],[data-tema],[data-demo-cambiar],[data-demo-fallo],[data-demo-corte],[data-demo-reiniciar],[data-buscar-zona]');
     if (!el) return;
-    if (el.dataset.rango) {
-      const foco = el.dataset.rango;
-      rangoGraf = foco; indiceGraf = null;
-      pintarPack();
-      document.querySelector('[data-rango="' + foco + '"]').focus();
-    }
-    else if (el.dataset.celda) { celdaGraf = Number(el.dataset.celda); indiceGraf = null; pintarPack(); }
-    else if ('volver' in el.dataset) history.back();
-    else if (el.dataset.bateria) ir('bateria', Number(el.dataset.bateria));
-    else if (el.dataset.pack) ir('pack', el.dataset.pack);
+    const D = el.dataset;
+    if ('volver' in D) history.back();
+    else if (D.ir) { if (D.ir !== vista) ir(D.ir); }
+    else if (D.ficha) ir('ficha', D.ficha);
+    else if (D.rango) { rangoCelda = D.rango; pintarFicha(); }
+    else if (D.celda) { celdaGraf = Number(D.celda); pintarFicha(); }
+    else if (D.grRango) { grRango = D.grRango; ultimaCarga = 0; pintarVista(); }
+    else if (D.filtroBat) { filtroBat = D.filtroBat; pintarBaterias(); }
+    else if (D.filtroMapa) { filtroMapa = D.filtroMapa; pintarMapa(); }
+    else if (D.modoAlarmas) { modoAlarmas = D.modoAlarmas; pintarAlarmas(); }
+    else if (D.tema) { ponerTema(D.tema); pintarAjustes(); if (graficaCelda) graficaCelda.repintar(); }
+    else if ('demoCambiar' in D) cambiarDemo(!modoDemo);
+    else if ('demoFallo' in D) simularFallo();
+    else if ('demoCorte' in D) { simularCorte(); refrescar(); }
+    else if ('demoReiniciar' in D) reiniciarDemo();
+    else if (D.buscarZona) { $('buscar').value = D.buscarZona; filtroBat = 'todos'; ir('baterias'); }
   });
-
-  // --- Buscador: "d 17", "D17" y "d-17" encuentran la misma batería ---
-  const plano = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  function coincide(id, textos, q) {
-    const m = q.match(/^([a-d])(\d+)$/);
-    if (m) return id[0].toLowerCase() === m[1] && Number(id.slice(2)) === Number(m[2]);
-    return plano(id).startsWith(q) || (q.length >= 3 && textos.some(t => plano(t).includes(q)));
-  }
-  function buscar() {
-    const texto = $('buscar').value.trim(), q = plano(texto);
-    let total = 0, unica = null;
-    const filtrar = (el, id, textos) => {
-      const ok = !q || coincide(id, textos, q);
-      el.hidden = !ok;
-      if (ok) { total++; unica = el; }
-    };
-    [1, 2].forEach(n => filtrar(document.querySelector('[data-bateria="' + n + '"]'), REALES[n].id, [REALES[n].nombre, REALES[n].zona.nombre]));
-    demo.forEach(b => filtrar(document.querySelector('.baldosa[data-pack="' + b.id + '"]'), b.id, [b.pol.nombre, 'demo']));
-    document.querySelectorAll('.polis > section').forEach(s => { s.hidden = !s.querySelector('.baldosa:not([hidden])'); });
-    $('bloque-general').hidden = !!q;
-    $('buscar-res').hidden = !q;
-    $('buscar-res').textContent = total ? total + (total === 1 ? ' batería encontrada' : ' baterías encontradas') : 'No hay ninguna batería que coincida con «' + texto + '»';
-    if (!q) montarMapaParque();
-    return total === 1 ? unica : null;
-  }
-  $('buscar').addEventListener('input', buscar);
+  $('buscar').addEventListener('input', pintarBaterias);
   $('buscar').addEventListener('keydown', ev => {
     if (ev.key !== 'Enter') return;
-    const el = buscar();
-    if (el) el.click();
+    const lista = pintarBaterias();
+    if (lista.length === 1) ir('ficha', lista[0].id);
+  });
+  $('buscar-ini').addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter') return;
+    const texto = $('buscar-ini').value.trim();
+    if (!texto) return;
+    $('buscar').value = texto; filtroBat = 'todos';
+    const lista = FL.filter(x => coincide(x, plano(texto)));
+    if (lista.length === 1) ir('ficha', lista[0].id); else ir('baterias');
+    $('buscar-ini').value = '';
   });
   $('ir-inicio').onclick = () => { if (vista !== 'inicio') ir('inicio'); };
-  $('bat-gps').onclick = () => ir('mapa', null, { real: actual });
-  $('pack-gps').onclick = () => ir('mapa', null, { demo: actual });
-  $('demo-reset').onclick = () => { crearDemo(); firmaAlarmas = null; pintarDemo(); };
-  $('demo-fallo').onclick = () => {
-    const sanas = demo.filter(b => !b.fallo && evaluar(b).nivel === 0);
-    if (!sanas.length) return;
-    const b = sanas[Math.floor(Math.random() * sanas.length)];
-    const celda = Math.floor(Math.random() * b.pol.celdas);
-    b.fallo = { celda, actual: b.v[celda], objetivo: 2.72 };
+  $('fi-gps').onclick = () => ir('mapa', null, { id: actual });
+  $('aj-demo').onclick = () => cambiarDemo(!modoDemo);
+  $('gr-disp').onchange = () => { grDisp = $('gr-disp').value; ultimaCarga = 0; pintarVista(); };
+  $('aj-borrar').onclick = async () => {
+    if (!confirm('¿Borrar el histórico de paquetes, gráficas e incidencias guardado en este dispositivo? No afecta a la base de datos.')) return;
+    incidencias = []; recientes = []; guardadoDesde = null;
+    if (bd) {
+      const tx = bd.transaction(['paquetes', 'horas', 'incidencias'], 'readwrite');
+      ['paquetes', 'horas', 'incidencias'].forEach(t => tx.objectStore(t).clear());
+    }
+    ultimaCarga = 0;
+    refrescar();
   };
+  window.addEventListener('resize', () => {
+    if (vista === 'ficha' && graficaCelda) graficaCelda.repintar();
+    if (vista === 'graficas') Object.values(grafs).forEach(g => g.repintar());
+  });
 
   // --- Arranque ---
   history.replaceState({ v: 'inicio' }, '');
-  $('bat-bms').innerHTML = filasBms();
-  crearDemo();
-  montarPoligonos();
-  pintar();
-  pintarDemo();
-  montarMapaParque();
-  setInterval(() => { demo.forEach(actualizarBateria); pintarDemo(); }, CADA_DEMO_MS);
-  if (CLAVE.length < 24) {
+  if (memoria.leer('tema') === 'claro') ponerTema('claro');
+  if (modoDemo) crearDemo();
+  refrescar();
+  setInterval(() => { if (modoDemo) demo.forEach(actualizarBateria); refrescar(); }, CADA_DEMO_MS);   // "hace X s" y el paso a NO CONECTADO no dependen de que lleguen datos
+  if (!HAY_CLAVE) {
     $('aviso').hidden = false;
     $('aviso').textContent = 'Para ver A-01 y B-01, las baterías reales, abre la aplicación con tu enlace completo. La DEMO funciona sin él.';
     $('red').hidden = true;
-  } else {
+  }
+  // Primero el histórico guardado, para no duplicar nada de lo que llegue después
+  cargarHistorico().catch(() => {}).then(() => {
+    if (!HAY_CLAVE) return;
     leer();
     escuchar();
     // Con el aviso en directo solo se repasa de vez en cuando; si se corta, se lee cada 2 s
     let vueltas = 0;
     setInterval(() => { if (!enVivo || ++vueltas % REPASO_VUELTAS === 0) leer(); }, CADA_MS);
-    setInterval(pintar, 1000);   // "hace X s" y el paso a NO CONECTADO no dependen de que lleguen datos
     document.addEventListener('visibilitychange', () => { if (!document.hidden) leer(); });
-  }
+  });
 </script>
 </body>
 </html>
