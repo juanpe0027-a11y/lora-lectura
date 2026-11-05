@@ -1222,7 +1222,7 @@
     const e = estadoDe(x), tono = { ok: 't-verde', ojo: 't-naranja', mal: 't-rojo', off: 't-gris' }[e.marca];
     const peor = t => x.alarmas.filter(a => t.includes(a.tipo)).reduce((n, a) => Math.max(n, a.nivel), 0);
     const dato = (t, v, n) => '<div class="dato' + (n ? ' marcada ' + (n === 2 ? 't-rojo' : 't-naranja') : '') + '"><span>' + t + '</span><b>' + v + '</b></div>';
-    return '<button class="banco ' + tono + '" type="button" data-ficha="' + x.id + '"><span class="bornes" aria-hidden="true"><i>+</i><i>−</i></span><span class="banco-cab"><b>' + icono('baterias') + nombreConMarca(x) + '</b><span class="pastilla ' + e.cls + '">' + e.texto + '</span></span>' +
+    return '<button class="banco ' + tono + '" type="button" data-ficha="' + x.id + '"><span class="bornes" aria-hidden="true"><i>+</i><i>−</i></span><span class="banco-cab"><b>' + icono('baterias') + (x.real && x.c.sinLora ? escapar(x.nombre) : nombreConMarca(x)) + '</b><span class="pastilla ' + e.cls + '">' + e.texto + '</span></span>' +
       dato('Tensión', x.tension !== null ? decimal(x.tension, x.tension > 30 ? 1 : 2) + ' V' : '—', peor(['tension_baja', 'tension_alta', 'desequilibrio'])) +
       dato('Temperatura', x.temp !== null && x.temp !== undefined ? decimal(x.temp, 1) + ' ºC' : '—', peor(['temperatura'])) +
       dato('Carga', socTexto(x) || '—') +
