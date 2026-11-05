@@ -671,6 +671,7 @@
       const d = e.dispositivos[k], n = limpiarNodo(d);
       if (!n) return;
       n.nombre = typeof d.nombre === 'string' && d.nombre ? d.nombre.slice(0, 20) : 'Dispositivo ' + k;
+      n.enlace = typeof d.enlace === 'string' ? d.enlace.slice(0, 12) : '';
       if (numero(d.voltios) > 0) n.tension = numero(d.voltios);
       r['nuevo:' + k] = n;
     });
@@ -1012,7 +1013,7 @@
       medida('Última recepción', x.ultimaMs ? '<b style="font-size:14.5px">' + ultimoDatoTexto(x) + '</b>' : noDisp('Sin datos'), x.ultimaMs ? fechaHora(x.ultimaMs) : ''),
     ].join(''));
     if (x.real && x.c.sinLora) {
-      poner('fi-ajustes', fila('Conexión', 'ESP-NOW, a través de una Heltec o la pantalla') + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
+      poner('fi-ajustes', fila('Enlace', x.conectado && x.d.enlace ? escapar(x.d.enlace) : suave('Sin enlace')) + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
     } else if (x.real) {
       poner('fi-ajustes', fila('Wi-Fi', textoWifi(x.d)) + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', textoGps(x.d)) + fila('Posición', x.lat !== null ? coordenadas(x) : suave('Sin posición')) + fila('Alimentación', textoCorriente(x.d)));
     } else {
