@@ -429,7 +429,9 @@
     { id: 'B-01', nombre: 'Batería 2', nodo: 'coche', otro: 'furgoneta', auxiliar: true, zona: { id: 'B', nombre: 'Polígono Sagunto', lat: 39.6605, lon: -0.2560, d: 0.0028 } },
   ];
   // ESP32 sin LoRa configurados desde la pantalla: se añaden solos en cuanto suben datos
-  const flotaSinLora = () => Object.keys(ultimo || {}).filter(k => k.startsWith('nuevo:')).sort().map(k => ({ id: 'E-' + k.slice(6), nombre: ultimo[k].nombre, nodo: k, sinLora: true, zona: { id: 'E', nombre: 'Sin LoRa' } }));
+  // Sale en el grupo de la batería con la que está enlazado; la placa lo envía en mayúsculas y sin acentos
+  const flotaDeEnlace = enlace => FLOTA.find(c => c.nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase() === enlace);
+  const flotaSinLora = () => Object.keys(ultimo || {}).filter(k => k.startsWith('nuevo:')).sort().map(k => ({ id: 'E-' + k.slice(6), nombre: ultimo[k].nombre, nodo: k, sinLora: true, zona: (flotaDeEnlace(ultimo[k].enlace) || { zona: { id: 'E', nombre: 'Sin LoRa' } }).zona }));
   const flotaReal = () => FLOTA.concat(flotaSinLora());
   const AVISO_V = 3.0, CRITICO_V = 2.8, AVISO_V_ALTA = 3.6, CRITICO_V_ALTA = 3.65, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
   const AUX_CRITICO = 11.8, AUX_AVISO = 12.2, AUX_ALTA = 14.8, AUX_MUY_ALTA = 15.5;   // batería auxiliar de 12 V, como en la pantalla del coche
@@ -520,7 +522,7 @@
   }
   const pastillaDe = x => { const e = estadoDe(x); return '<span class="pastilla ' + e.cls + '">' + e.texto + '</span>'; };
   const COLOR_MARCA = { ok: '#3ddc84', ojo: '#ffa62b', mal: '#ff6468', off: '#8796a6' };
-  const nombreConMarca = x => escapar(x.id) + (x.real ? '' : ' ' + marcaDemo);
+  const nombreConMarca = x => (x.real && x.c.sinLora ? escapar(x.nombre) : escapar(x.id)) + (x.real ? '' : ' ' + marcaDemo);
 
   // Estado de la red LoRa: solo con placas reales
   function estadoRed() {
@@ -1124,7 +1126,7 @@
     const e = estadoDe(x), a = [];
     if (x.tension !== null) a.push(decimal(x.tension, x.tension > 30 ? 0 : 1) + ' V');
     if (socTexto(x)) a.push('SoC ' + socTexto(x));
-    return '<button class="baldosa ' + e.baldosa + '" type="button" data-ficha="' + x.id + '"><strong>' + nombreConMarca(x) + '</strong><span>' + (x.real ? escapar(x.nombre) : '') + (x.real && a.length ? ' · ' : '') + a.join(' · ') + '</span><span>' + (x.ultimaMs ? (x.conectado ? (x.temp !== null && x.temp !== undefined ? Math.round(x.temp) + ' ºC · ' : '') + 'En línea' : 'Último ' + ultimoDatoTexto(x)) : 'Sin datos') + '</span><em>' + e.texto + '</em></button>';
+    return '<button class="baldosa ' + e.baldosa + '" type="button" data-ficha="' + x.id + '"><strong>' + nombreConMarca(x) + '</strong><span>' + (x.real && !x.c.sinLora ? escapar(x.nombre) : '') + (x.real && !x.c.sinLora && a.length ? ' · ' : '') + a.join(' · ') + '</span><span>' + (x.ultimaMs ? (x.conectado ? (x.temp !== null && x.temp !== undefined ? Math.round(x.temp) + ' ºC · ' : '') + 'En línea' : 'Último ' + ultimoDatoTexto(x)) : 'Sin datos') + '</span><em>' + e.texto + '</em></button>';
   }
   function pintarBaterias() {
     const texto = $('buscar').value.trim(), q = plano(texto);
@@ -1286,7 +1288,7 @@
       kpi('corte', 'Dejaron de transmitir', callados, u ? 'Último paquete ' + hace(Date.now() - u.ultimaMs) : 'Sin paquetes aún', callados ? 't-rojo' : 't-gris', 'alarmas'));
     const lista = emisores.slice(0, 200);
     poner('com-emisores', '<table><thead><tr><th scope="col">Dispositivo</th><th scope="col">Estado</th><th scope="col">Último paquete</th><th scope="col">RSSI</th><th scope="col">SNR</th></tr></thead><tbody>' + lista.map(x =>
-      '<tr data-ficha="' + x.id + '"><td>' + nombreConMarca(x) + (x.real ? ' ' + suave(escapar(x.nombre)) : '') + '</td><td>' + (x.conectado ? '<span class="pastilla si">EMITE</span>' : x.ultimaMs ? '<span class="pastilla no">CALLADO</span>' : '<span class="pastilla gris">SIN DATOS</span>') + '</td><td>' + (x.ultimaMs ? (x.conectado && !x.real ? 'ahora' : ultimoDatoTexto(x)) : '—') + '</td><td class="c-lora">' + (x.rssi ? x.rssi + ' dB' : '—') + '</td><td>' + (x.snr !== null && x.snr !== undefined ? decimal(x.snr, 1) + ' dB' : suave('No lo envía')) + '</td></tr>').join('') + '</tbody></table>');
+      '<tr data-ficha="' + x.id + '"><td>' + nombreConMarca(x) + (x.real && !x.c.sinLora ? ' ' + suave(escapar(x.nombre)) : '') + '</td><td>' + (x.conectado ? '<span class="pastilla si">EMITE</span>' : x.ultimaMs ? '<span class="pastilla no">CALLADO</span>' : '<span class="pastilla gris">SIN DATOS</span>') + '</td><td>' + (x.ultimaMs ? (x.conectado && !x.real ? 'ahora' : ultimoDatoTexto(x)) : '—') + '</td><td class="c-lora">' + (x.rssi ? x.rssi + ' dB' : '—') + '</td><td>' + (x.snr !== null && x.snr !== undefined ? decimal(x.snr, 1) + ' dB' : suave('No lo envía')) + '</td></tr>').join('') + '</tbody></table>');
     poner('com-estaciones', '<table><thead><tr><th scope="col">Estación</th><th scope="col">Estado</th><th scope="col">Oye a</th><th scope="col">RSSI LoRa</th><th scope="col">Wi-Fi</th><th scope="col">Última subida</th></tr></thead><tbody>' + estaciones.map(e => {
       const d = e.x.d, oido = d && d.rssi_lora && e.x.conectado;
       return '<tr><td>Placa de ' + escapar(e.x.id) + '</td><td>' + (e.activa ? '<span class="pastilla lora">ACTIVA</span>' : '<span class="pastilla gris">INACTIVA</span>') + '</td><td>' + escapar((FLOTA.find(c => c.nodo === e.x.c.otro) || {}).id || '—') + '</td><td class="c-lora">' + (oido ? d.rssi_lora + ' dB' : '—') + '</td><td>' + (d && d.wifi_red ? escapar(d.wifi_red) + (e.activa ? rayas(rayasWifi(d.rssi_wifi)) : '') : '—') + '</td><td>' + (d && d.wifi_hora ? hace(Date.now() - d.wifi_hora) : '—') + '</td></tr>';
