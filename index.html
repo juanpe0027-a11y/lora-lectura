@@ -428,6 +428,9 @@
     { id: 'A-01', nombre: 'Batería 1', nodo: 'furgoneta', otro: 'coche', zona: { id: 'A', nombre: 'Polígono Canet', lat: 39.6775, lon: -0.2230, d: 0.0022 } },
     { id: 'B-01', nombre: 'Batería 2', nodo: 'coche', otro: 'furgoneta', auxiliar: true, zona: { id: 'B', nombre: 'Polígono Sagunto', lat: 39.6605, lon: -0.2560, d: 0.0028 } },
   ];
+  // ESP32 sin LoRa configurados desde la pantalla: se añaden solos en cuanto suben datos
+  const flotaSinLora = () => Object.keys(ultimo || {}).filter(k => k.startsWith('nuevo:')).sort().map(k => ({ id: 'E-' + k.slice(6), nombre: ultimo[k].nombre, nodo: k, sinLora: true, zona: { id: 'E', nombre: 'Sin LoRa' } }));
+  const flotaReal = () => FLOTA.concat(flotaSinLora());
   const AVISO_V = 3.0, CRITICO_V = 2.8, AVISO_V_ALTA = 3.6, CRITICO_V_ALTA = 3.65, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
   const AUX_CRITICO = 11.8, AUX_AVISO = 12.2, AUX_ALTA = 14.8, AUX_MUY_ALTA = 15.5;   // batería auxiliar de 12 V, como en la pantalla del coche
   const NOMBRES_TIPO = { tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
@@ -468,12 +471,12 @@
 
   function dispositivoReal(c) {
     const e = ultimo || {}, d = e[c.nodo], otro = e[c.otro], aux = c.auxiliar ? e.bateria : null, tieneAux = !!aux && !!aux.hora;
-    const x = { id: c.id, nombre: c.nombre, real: true, c, d, otro, aux: tieneAux ? aux : null, zona: c.zona.nombre, zonaId: c.zona.id, modelo: 'wBMS-R24 o wBMS-R32', conectado: conectado(d), ultimaMs: d && d.hora ? d.hora - d.edad_s * 1000 : null };
+    const x = { id: c.id, nombre: c.nombre, real: true, c, d, otro, aux: tieneAux ? aux : null, zona: c.zona.nombre, zonaId: c.zona.id, modelo: c.sinLora ? 'ESP32 sin LoRa' : 'wBMS-R24 o wBMS-R32', conectado: conectado(d), ultimaMs: d && d.hora ? d.hora - d.edad_s * 1000 : null };
     x.lat = d && d.lat !== undefined ? d.lat : null; x.lon = x.lat === null ? null : d.lon;
     const bms = d || {};
     x.celdas = bms.celdas || null;
     x.tension = opcional(bms.tension);
-    x.tensionNota = '';
+    x.tensionNota = c.sinLora && x.tension !== null ? 'Sensor del dispositivo' : '';
     if (x.tension === null && x.celdas) x.tension = x.celdas.reduce((a, v) => a + v, 0);
     if (x.tension === null && tieneAux) { x.tension = aux.voltios; x.tensionNota = conectado(aux) ? 'Sensor de batería auxiliar' : 'Sensor auxiliar · dato antiguo'; }
     x.soc = opcional(bms.soc); x.temp = opcional(bms.temp); x.rssi = bms.rssi_lora || null; x.snr = opcional(bms.snr); x.corriente = opcional(bms.corriente); x.soh = opcional(bms.soh);
@@ -503,7 +506,7 @@
   }
 
   function recalcular() {
-    FL = FLOTA.map(dispositivoReal).concat(modoDemo ? demo.map(dispositivoDemo) : []);
+    FL = flotaReal().map(dispositivoReal).concat(modoDemo ? demo.map(dispositivoDemo) : []);
     sincronizarIncidencias();
   }
   const dispPorId = id => FL.find(x => x.id === id);
@@ -636,13 +639,13 @@
   }
 
   function registrarPaquetes() {
-    FLOTA.forEach(c => {
+    flotaReal().forEach(c => {
       const d = (ultimo || {})[c.nodo];
       if (!d || !d.hora || ultimaHora[c.id] === d.hora) return;
       ultimaHora[c.id] = d.hora;
       const e = ultimo, aux = c.auxiliar ? e.bateria : null;
       const directo = d.wifi_hora && Math.abs(d.wifi_hora - d.hora) < 3000;
-      const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
+      const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: c.sinLora ? 'ESP-NOW' : directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
       if (d.celdas) { p.c = d.celdas; p.vmin = Math.min(...d.celdas); p.vmax = Math.max(...d.celdas); p.tension = d.celdas.reduce((a, v) => a + v, 0); }
       if (p.tension === null && aux && aux.hora && conectado(aux)) p.tension = aux.voltios;
       p.soc = opcional(d.soc); p.temp = opcional(d.temp);
@@ -664,6 +667,13 @@
     if (!e || typeof e !== 'object') return {};
     const r = {};
     FLOTA.forEach(c => { r[c.nodo] = limpiarNodo(e[c.nodo]); });
+    if (e.dispositivos && typeof e.dispositivos === 'object') Object.keys(e.dispositivos).filter(k => /^[0-9A-F]{6}$/.test(k)).slice(0, 32).forEach(k => {
+      const d = e.dispositivos[k], n = limpiarNodo(d);
+      if (!n) return;
+      n.nombre = typeof d.nombre === 'string' && d.nombre ? d.nombre.slice(0, 20) : 'Dispositivo ' + k;
+      if (numero(d.voltios) > 0) n.tension = numero(d.voltios);
+      r['nuevo:' + k] = n;
+    });
     if (e.bateria && typeof e.bateria === 'object') r.bateria = { voltios: numero(e.bateria.voltios), rele: e.bateria.rele === true, hora: numero(e.bateria.hora), edad_s: numero(e.bateria.edad_s) };
     return r;
   }
@@ -799,7 +809,7 @@
     refrescar();
     if (mapa) { montarDemoEnMapa(); encuadrarMapa(); }
   }
-  const dispPorIdReal = id => FLOTA.some(c => c.id === id);
+  const dispPorIdReal = id => flotaReal().some(c => c.id === id);
 
   // --- Gráficas ---
   const RANGOS = {
@@ -1001,7 +1011,9 @@
       medida('SNR', x.snr !== null && x.snr !== undefined ? '<b class="c-lora">' + decimal(x.snr, 1) + ' dB</b>' : noDisp(x.real ? 'La placa no lo envía' : 'No disponible')),
       medida('Última recepción', x.ultimaMs ? '<b style="font-size:14.5px">' + ultimoDatoTexto(x) + '</b>' : noDisp('Sin datos'), x.ultimaMs ? fechaHora(x.ultimaMs) : ''),
     ].join(''));
-    if (x.real) {
+    if (x.real && x.c.sinLora) {
+      poner('fi-ajustes', fila('Conexión', 'ESP-NOW, a través de una Heltec o la pantalla') + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
+    } else if (x.real) {
       poner('fi-ajustes', fila('Wi-Fi', textoWifi(x.d)) + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', textoGps(x.d)) + fila('Posición', x.lat !== null ? coordenadas(x) : suave('Sin posición')) + fila('Alimentación', textoCorriente(x.d)));
     } else {
       poner('fi-ajustes', fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(x)) + fila('Alimentación', 'Simulada'));
@@ -1185,7 +1197,7 @@
     navesMapa = {};
     if (capaPuntos) capaPuntos.clearLayers();
     if (capaResumen) capaResumen.clearLayers();
-    Object.keys(marcadores).forEach(k => { if (!FLOTA.some(c => c.id === k)) delete marcadores[k]; });
+    Object.keys(marcadores).forEach(k => { if (!dispPorIdReal(k)) delete marcadores[k]; });
     Object.keys(resumenesNave).forEach(k => delete resumenesNave[k]);
     if (modoDemo) POLIGONOS.forEach(p => {
       const nave = L.polygon(p.nave, { color: '#ffa62b', weight: 2, fillOpacity: 0.12 }).bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)', { direction: 'top' }).addTo(mapa);
@@ -1264,7 +1276,7 @@
   // Comunicaciones
   function pintarComunicaciones() {
     const red = estadoRed(), emisores = FL.filter(x => x.real || modoDemo), reales = FL.filter(x => x.real), u = ultimaRecepcionReal();
-    const estaciones = reales.map(x => ({ x, activa: !!(x.d && x.d.wifi_hora && Date.now() - x.d.wifi_hora < CONECTADO_MS) }));
+    const estaciones = reales.filter(x => !x.c.sinLora).map(x => ({ x, activa: !!(x.d && x.d.wifi_hora && Date.now() - x.d.wifi_hora < CONECTADO_MS) }));
     const callados = emisores.filter(x => !x.conectado && x.ultimaMs).length;
     poner('com-kpis',
       kpi('comunicaciones', 'Red LoRa', red.texto, red.sub, red.tono, 'comunicaciones') +
@@ -1413,7 +1425,7 @@
   }
   window.addEventListener('popstate', ev => {
     const s = ev.state || { v: 'inicio' };
-    if (s.v === 'ficha' && !FLOTA.some(c => c.id === s.id) && !modoDemo) { mostrar('inicio'); return; }
+    if (s.v === 'ficha' && !dispPorIdReal(s.id) && !modoDemo) { mostrar('inicio'); return; }
     mostrar(s.v, s.id, s.dest);
   });
 
