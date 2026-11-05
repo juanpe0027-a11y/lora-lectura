@@ -72,6 +72,8 @@
   .rayas i:nth-child(1){height:5px}.rayas i:nth-child(2){height:9px}.rayas i:nth-child(3){height:13px}.rayas i:nth-child(4){height:18px}
   .mapa { width:100%; height:62vh; min-height:340px; border-radius:13px; overflow:hidden; background:#16283d; color:#20262e; }
   .mapa.bajo { height:320px; min-height:0; }
+  .nave-resumen { box-sizing:border-box; text-align:center; border:2px solid #fff; border-radius:50%; color:#0c1b2e; font:700 14px/30px system-ui, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,.45); }
+  .nave-resumen.nv0 { background:#43d17f; } .nave-resumen.nv1 { background:#f7b23b; } .nave-resumen.nv2 { background:#ff6b6b; }
   .sin-mapa { display:flex; align-items:center; justify-content:center; height:100%; padding:20px; color:var(--suave); text-align:center; }
   .barra-mapa { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
   .alarmas { display:grid; gap:7px; margin-top:12px; }
@@ -148,7 +150,7 @@
     </section>
     <div id="bloque-general" class="rejilla-inicio">
       <section class="tarjeta" aria-labelledby="t-mapa">
-        <div class="titulo-izq" style="margin-bottom:12px"><h2 id="t-mapa">Mapa</h2><span class="c-suave" style="font-size:14px">Azul: baterías reales</span></div>
+        <div class="titulo-izq" style="margin-bottom:12px"><h2 id="t-mapa">Mapa</h2><span class="c-suave" style="font-size:14px">Azul: reales · Número: baterías de cada nave, tócalo para verlas</span></div>
         <div id="mapa-parque" class="mapa bajo"></div>
       </section>
       <div class="pila" style="align-content:start">
@@ -438,9 +440,10 @@
 
   // --- DEMO: todo se simula aquí mismo y no se escribe nada ---
   const AVISO_V = 3.0, CRITICO_V = 2.8, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
+  // Cada nave son las cuatro esquinas de un edificio del mapa (noroeste, noreste, sureste, suroeste); solo para situar la DEMO
   const POLIGONOS = [
-    { id: 'C', nombre: 'Polígono Paterna', modelo: 'wBMS-R24', celdas: 24, sondas: 6, n: 15, lat: 39.5165, lon: -0.4445, d: 0.0034 },
-    { id: 'D', nombre: 'Polígono Riba-roja', modelo: 'wBMS-R32', celdas: 32, sondas: 10, n: 23, lat: 39.5340, lon: -0.5325, d: 0.0044 },
+    { id: 'C', nombre: 'Polígono Paterna', modelo: 'wBMS-R24', celdas: 24, sondas: 6, n: 15, cols: 5, nave: [[39.512636, -0.44997], [39.512616, -0.449147], [39.512071, -0.449097], [39.512093, -0.449978]] },
+    { id: 'D', nombre: 'Polígono Riba-roja', modelo: 'wBMS-R32', celdas: 32, sondas: 10, n: 23, cols: 5, nave: [[39.486748, -0.531974], [39.486648, -0.530727], [39.485676, -0.530859], [39.485788, -0.532117]] },
   ];
   let demo = [];
   const demoPorId = id => demo.find(b => b.id === id);
@@ -451,13 +454,13 @@
   function crearDemo() {
     demo = [];
     POLIGONOS.forEach(p => {
-      const cols = Math.ceil(Math.sqrt(p.n * 2)), filas = Math.ceil(p.n / cols);
+      const filas = Math.ceil(p.n / p.cols), [no, ne, se, so] = p.nave;
       for (let i = 0; i < p.n; i++) {
-        const c = i % cols, f = Math.floor(i / cols);
+        const u = 0.12 + 0.76 * (i % p.cols) / (p.cols - 1), v = 0.15 + 0.7 * Math.floor(i / p.cols) / (filas - 1);
+        const enNave = k => (1 - v) * ((1 - u) * no[k] + u * ne[k]) + v * ((1 - u) * so[k] + u * se[k]);
         demo.push({
           id: p.id + '-' + String(i + 1).padStart(2, '0'), pol: p,
-          lat: p.lat + (filas > 1 ? 0.7 - 1.4 * f / (filas - 1) : 0) * p.d,
-          lon: p.lon + (cols > 1 ? -1.4 + 2.8 * c / (cols - 1) : 0) * p.d,
+          lat: enNave(0), lon: enNave(1),
           soc: azar(35, 96), soh: azar(88, 99), corriente: azar(-35, 35),
           margen: Array.from({ length: p.celdas }, () => azar(-0.008, 0.008)),
           sondasBase: Array.from({ length: p.sondas }, () => azar(-1.5, 1.5)),
@@ -666,10 +669,18 @@
       puntosGraf.slice().reverse().map(p => '<tr><td>' + fechaGraf(p.hora, true) + '</td><td>' + decimal(p.celda, 3) + ' V</td><td>' + decimal(p.max, 3) + ' V</td><td>' + decimal(p.min, 3) + ' V</td></tr>').join('') + '</tbody></table>';
   }
 
+  const ZOOM_BATERIAS = 17;
   let mapaParque = null, encuadrarParque = null;
-  const marcadores = {}, marcadoresReales = {};
+  const marcadores = {}, marcadoresReales = {}, resumenesNave = {};
+  const iconoNave = (p, nivel) => L.divIcon({ className: 'nave-resumen nv' + nivel, html: String(p.n), iconSize: [34, 34] });
   function pintarMarcadores() {
     demo.forEach(b => { if (marcadores[b.id]) marcadores[b.id].setStyle({ fillColor: colorNivel(evaluar(b).nivel) }); });
+    POLIGONOS.forEach(p => {
+      const m = resumenesNave[p.id];
+      if (!m) return;
+      const nivel = Math.max(...demo.filter(b => b.pol === p).map(b => evaluar(b).nivel));
+      if (nivel !== m.nivel) { m.nivel = nivel; m.setIcon(iconoNave(p, nivel)); }
+    });
   }
   function pintarMarcadoresReales() {
     if (!mapaParque) return;
@@ -688,13 +699,29 @@
       if (mapaParque) { mapaParque.invalidateSize(); return; }
       mapaParque = crearMapa(L, 'mapa-parque');
       // Las zonas de Canet y Sagunto son aproximadas: la batería real sale donde diga su GPS
-      const zonas = [1, 2].map(n => L.polygon(contorno(REALES[n].zona), { color: '#62bcff', weight: 2, fillOpacity: 0.14 }).bindTooltip(REALES[n].zona.nombre + ' · zona aproximada').addTo(mapaParque))
-        .concat(POLIGONOS.map(p => L.polygon(contorno(p), { color: '#f7b23b', weight: 2, fillOpacity: 0.12 }).bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)').addTo(mapaParque)));
-      demo.forEach(b => {
-        marcadores[b.id] = L.circleMarker([b.lat, b.lon], { radius: 6, weight: 1.5, color: '#fff', fillOpacity: 1, fillColor: colorNivel(evaluar(b).nivel) }).bindTooltip(b.id).on('click', () => ir('pack', b.id)).addTo(mapaParque);
+      const zonas = [1, 2].map(n => L.polygon(contorno(REALES[n].zona), { color: '#62bcff', weight: 2, fillOpacity: 0.14 }).bindTooltip(REALES[n].zona.nombre + ' · zona aproximada', { direction: 'top' }).addTo(mapaParque));
+      const naves = POLIGONOS.map(p => L.polygon(p.nave, { color: '#f7b23b', weight: 2, fillOpacity: 0.12 }).bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)', { direction: 'top' }).addTo(mapaParque));
+      const capaPuntos = L.layerGroup(), capaResumen = L.layerGroup();
+      POLIGONOS.forEach((p, i) => {
+        const nivel = Math.max(...demo.filter(b => b.pol === p).map(b => evaluar(b).nivel));
+        resumenesNave[p.id] = L.marker(naves[i].getBounds().getCenter(), { icon: iconoNave(p, nivel), alt: p.nombre + ', ' + p.n + ' baterías' })
+          .bindTooltip(p.nombre + ' · ' + p.n + ' baterías (DEMO)', { direction: 'top', offset: [0, -14] })
+          .on('click', () => mapaParque.fitBounds(naves[i].getBounds(), { padding: [20, 20], maxZoom: 18 })).addTo(capaResumen);
+        resumenesNave[p.id].nivel = nivel;
       });
-      encuadrarParque = () => mapaParque.fitBounds(L.featureGroup(zonas.concat(Object.values(marcadoresReales))).getBounds(), { padding: [16, 16] });
+      demo.forEach(b => {
+        marcadores[b.id] = L.circleMarker([b.lat, b.lon], { radius: 6, weight: 1.5, color: '#fff', fillOpacity: 1, fillColor: colorNivel(evaluar(b).nivel) }).bindTooltip(b.id).on('click', () => ir('pack', b.id)).addTo(capaPuntos);
+      });
+      // De lejos no caben las baterías dentro de la nave: se ve un solo círculo con el total y el peor estado
+      const verCapas = () => {
+        const cerca = mapaParque.getZoom() >= ZOOM_BATERIAS;
+        (cerca ? capaResumen : capaPuntos).remove();
+        (cerca ? capaPuntos : capaResumen).addTo(mapaParque);
+      };
+      encuadrarParque = () => mapaParque.fitBounds(L.featureGroup(zonas.concat(naves, Object.values(marcadoresReales))).getBounds(), { padding: [24, 24] });
       encuadrarParque();
+      verCapas();
+      mapaParque.on('zoomend', verCapas);   // después del primer encuadre, cuando el mapa ya puede dibujar círculos
       mapaParque.on('resize', encuadrarParque);   // al girar el móvil siguen viéndose todos los polígonos
       pintarMarcadoresReales();
     }).catch(() => mapaNoDisponible('mapa-parque'));
