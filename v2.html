@@ -554,8 +554,11 @@
   // ESP32 sin LoRa configurados desde la pantalla: se añaden solos en cuanto suben datos
   // Sale en el grupo de la batería con la que está enlazado; la placa lo envía en mayúsculas y sin acentos
   const flotaDeEnlace = enlace => FLOTA.find(c => c.nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase() === enlace);
-  const flotaSinLora = () => Object.keys(ultimo || {}).filter(k => k.startsWith('nuevo:')).sort().map(k => ({ id: 'E-' + k.slice(6), nombre: ultimo[k].nombre, nodo: k, sinLora: true, zona: (flotaDeEnlace(ultimo[k].enlace) || { zona: { id: 'E', nombre: 'Sin LoRa' } }).zona }));
-  const flotaReal = () => FLOTA.concat(flotaSinLora());
+  const flotaSinLora = () => Object.keys(ultimo || {}).filter(k => k.startsWith('nuevo:')).sort().map(k => ({ id: 'E-' + k.slice(6), nombre: ultimo[k].nombre, nodo: k, sinLora: true, conNombre: true, zona: (flotaDeEnlace(ultimo[k].enlace) || { zona: { id: 'E', nombre: 'Sin LoRa' } }).zona }));
+  // Red por turnos de cuatro Heltec: BATERIA 1 es la pasarela con Wi-Fi. Cada una sale en cuanto sube datos.
+  const ZONA_RED = { id: 'R', nombre: 'Red por turnos', lat: 39.6690, lon: -0.2400, d: 0.0025 };
+  const flotaRed = () => [1, 2, 3, 4].filter(n => ultimo && ultimo['red:b' + n]).map(n => ({ id: 'R-0' + n, nombre: 'Batería ' + n, nodo: 'red:b' + n, red: n, conNombre: true, zona: ZONA_RED }));
+  const flotaReal = () => FLOTA.concat(flotaSinLora(), flotaRed());
   const AVISO_V = 3.0, CRITICO_V = 2.8, AVISO_V_ALTA = 3.6, CRITICO_V_ALTA = 3.65, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
   const AUX_CRITICO = 11.8, AUX_AVISO = 12.2, AUX_ALTA = 14.8, AUX_MUY_ALTA = 15.5;   // batería auxiliar de 12 V, como en la pantalla del coche
   const NOMBRES_TIPO = { tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
@@ -602,6 +605,7 @@
     x.celdas = bms.celdas || null;
     x.tension = opcional(bms.tension);
     x.tensionNota = c.sinLora && x.tension !== null ? 'Sensor del dispositivo' : '';
+    if (c.red) { x.modelo = 'Heltec V3 · ' + (bms.simulado ? 'BMS simulado' : 'BMS'); x.tensionNota = bms.simulado ? 'Dato simulado' : ''; }
     if (x.tension === null && x.celdas) x.tension = x.celdas.reduce((a, v) => a + v, 0);
     if (x.tension === null && tieneAux) { x.tension = aux.voltios; x.tensionNota = conectado(aux) ? 'Sensor de batería auxiliar' : 'Sensor auxiliar · dato antiguo'; }
     x.soc = opcional(bms.soc); x.temp = opcional(bms.temp); x.rssi = bms.rssi_lora || null; x.snr = opcional(bms.snr); x.corriente = opcional(bms.corriente); x.soh = opcional(bms.soh);
@@ -645,7 +649,7 @@
   }
   const pastillaDe = x => { const e = estadoDe(x); return '<span class="pastilla ' + e.cls + '">' + e.texto + '</span>'; };
   const COLOR_MARCA = { ok: '#3ddc84', ojo: '#ffa62b', mal: '#ff6468', off: '#8796a6' };
-  const nombreConMarca = x => (x.real && x.c.sinLora ? escapar(x.nombre) : escapar(x.id)) + (x.real ? '' : ' ' + marcaDemo);
+  const nombreConMarca = x => (x.real && x.c.conNombre ? escapar(x.nombre) : escapar(x.id)) + (x.real ? '' : ' ' + marcaDemo);
 
   // Estado de la red LoRa: solo con placas reales
   function estadoRed() {
@@ -770,7 +774,7 @@
       ultimaHora[c.id] = d.hora;
       const e = ultimo, aux = c.auxiliar ? e.bateria : null;
       const directo = d.wifi_hora && Math.abs(d.wifi_hora - d.hora) < 3000;
-      const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: c.sinLora ? 'ESP-NOW' : directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
+      const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: c.red === 1 ? 'Pasarela' : c.red ? 'LoRa por turnos' : c.sinLora ? 'ESP-NOW' : directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
       if (d.celdas) { p.c = d.celdas; p.vmin = Math.min(...d.celdas); p.vmax = Math.max(...d.celdas); p.tension = d.celdas.reduce((a, v) => a + v, 0); }
       if (p.tension === null && aux && aux.hora && conectado(aux)) p.tension = aux.voltios;
       p.soc = opcional(d.soc); p.temp = opcional(d.temp);
@@ -799,6 +803,14 @@
       n.enlace = typeof d.enlace === 'string' ? d.enlace.slice(0, 12) : '';
       if (numero(d.voltios) > 0) n.tension = numero(d.voltios);
       r['nuevo:' + k] = n;
+    });
+    if (e.red && typeof e.red === 'object') [1, 2, 3, 4].forEach(k => {
+      const d = e.red['b' + k], n = limpiarNodo(d);
+      if (!n) return;
+      n.simulado = d.simulado === true;
+      n.calidad = numero(d.calidad);
+      if (e.red.pasarela && typeof e.red.pasarela === 'object') { n.wifi_red = typeof e.red.pasarela.wifi_red === 'string' ? e.red.pasarela.wifi_red.slice(0, 32) : ''; n.rssi_wifi = numero(e.red.pasarela.rssi_wifi); n.wifi_hora = numero(e.red.pasarela.hora); }
+      r['red:b' + k] = n;
     });
     if (e.bateria && typeof e.bateria === 'object') r.bateria = { voltios: numero(e.bateria.voltios), rele: e.bateria.rele === true, hora: numero(e.bateria.hora), edad_s: numero(e.bateria.edad_s) };
     return r;
@@ -1153,7 +1165,11 @@
       medida('SNR', x.snr !== null && x.snr !== undefined ? '<b class="c-lora">' + decimal(x.snr, 1) + ' dB</b>' : noDisp(x.real ? 'La placa no lo envía' : 'No disponible')),
       medida('Última recepción', x.ultimaMs ? '<b style="font-size:14.5px">' + ultimoDatoTexto(x) + '</b>' : noDisp('Sin datos'), x.ultimaMs ? fechaHora(x.ultimaMs) : ''),
     ].join(''));
-    if (x.real && x.c.sinLora) {
+    if (x.real && x.c.red) {
+      const papel = x.c.red === 1 ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo · hueco ' + (x.c.red - 1) + ' del ciclo de 1 s';
+      poner('fi-ajustes', fila('Papel', papel) + fila('Wi-Fi de la pasarela', textoWifi(x.d)) +
+        fila('Enlace LoRa', x.c.red === 1 ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) + fila('Posición', suave('Sin posición')));
+    } else if (x.real && x.c.sinLora) {
       poner('fi-ajustes', fila('Enlace', x.conectado && x.d.enlace ? escapar(x.d.enlace) : suave('Sin enlace')) + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
     } else if (x.real) {
       poner('fi-ajustes', fila('Wi-Fi', textoWifi(x.d)) + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', textoGps(x.d)) + fila('Posición', x.lat !== null ? coordenadas(x) : suave('Sin posición')) + fila('Alimentación', textoCorriente(x.d)));
@@ -1225,7 +1241,7 @@
     const e = estadoDe(x), tono = { ok: 't-verde', ojo: 't-naranja', mal: 't-rojo', off: 't-gris' }[e.marca];
     const peor = t => x.alarmas.filter(a => t.includes(a.tipo)).reduce((n, a) => Math.max(n, a.nivel), 0);
     const dato = (t, v, n) => '<div class="dato' + (n ? ' marcada ' + (n === 2 ? 't-rojo' : 't-naranja') : '') + '"><span>' + t + '</span><b>' + v + '</b></div>';
-    return '<button class="banco ' + tono + '" type="button" data-ficha="' + x.id + '"><span class="bornes" aria-hidden="true"><i>+</i><i>−</i></span><span class="banco-cab"><b>' + icono('baterias') + (x.real && x.c.sinLora ? escapar(x.nombre) : nombreConMarca(x)) + '</b><span class="pastilla ' + e.cls + '">' + e.texto + '</span></span>' +
+    return '<button class="banco ' + tono + '" type="button" data-ficha="' + x.id + '"><span class="bornes" aria-hidden="true"><i>+</i><i>−</i></span><span class="banco-cab"><b>' + icono('baterias') + (x.real && x.c.conNombre ? escapar(x.nombre) : nombreConMarca(x)) + '</b><span class="pastilla ' + e.cls + '">' + e.texto + '</span></span>' +
       dato('Tensión', x.tension !== null ? decimal(x.tension, x.tension > 30 ? 1 : 2) + ' V' : '—', peor(['tension_baja', 'tension_alta', 'desequilibrio'])) +
       dato('Temperatura', x.temp !== null && x.temp !== undefined ? decimal(x.temp, 1) + ' ºC' : '—', peor(['temperatura'])) +
       dato('Carga', socTexto(x) || '—') +
@@ -1481,7 +1497,7 @@
   // Comunicaciones
   function pintarComunicaciones() {
     const red = estadoRed(), emisores = FL.filter(x => x.real || modoDemo), reales = FL.filter(x => x.real), u = ultimaRecepcionReal();
-    const estaciones = reales.filter(x => !x.c.sinLora).map(x => ({ x, activa: !!(x.d && x.d.wifi_hora && Date.now() - x.d.wifi_hora < CONECTADO_MS) }));
+    const estaciones = reales.filter(x => !x.c.sinLora && !(x.c.red > 1)).map(x => ({ x, activa: !!(x.d && x.d.wifi_hora && Date.now() - x.d.wifi_hora < CONECTADO_MS) }));
     const callados = emisores.filter(x => !x.conectado && x.ultimaMs).length;
     poner('com-kpis',
       kpi('comunicaciones', 'Red LoRa', red.texto, red.sub, red.tono, 'comunicaciones') +
