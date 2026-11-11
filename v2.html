@@ -498,7 +498,12 @@
   const numero = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
   const opcional = v => { if (v === undefined || v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
   const decimal = (n, d) => n.toFixed(d).replace('.', ',');
-  const conectado = d => !!d && !!d.hora && Date.now() - d.hora + d.edad_s * 1000 < CONECTADO_MS;
+  // Red por turnos: la pasarela sube cada 0,5 s. Cada batería se compara con la hora de la pasarela (las dos son del
+  // servidor, así que no importa si el reloj del móvil va mal) y la pasarela con el momento en que llegó aquí su último dato.
+  const RED_VIVA_MS = 3000, RED_ATRASO_MS = 2500;
+  let redVista = { hora: 0, aqui: 0 };
+  const pasarelaViva = () => !!redVista.hora && Date.now() - redVista.aqui < RED_VIVA_MS;
+  const conectado = d => !!d && !!d.hora && (d.red ? pasarelaViva() && d.atrasoRed < RED_ATRASO_MS : Date.now() - d.hora + d.edad_s * 1000 < CONECTADO_MS);
   const fila = (t, v) => '<div class="fila"><b>' + t + '</b><span class="val">' + v + '</span></div>';
   const suave = t => '<span class="c-suave">' + t + '</span>';
   const marcaDemo = '<span class="marca-demo">DEMO</span>';
@@ -804,10 +809,15 @@
       if (numero(d.voltios) > 0) n.tension = numero(d.voltios);
       r['nuevo:' + k] = n;
     });
+    const horaPasarela = e.red && e.red.pasarela ? numero(e.red.pasarela.hora) : 0;
+    // La primera vez no se sabe cuándo llegó: se usa el reloj del móvil
+    if (horaPasarela !== redVista.hora) redVista = { hora: horaPasarela, aqui: redVista.hora ? Date.now() : Math.min(Date.now(), horaPasarela) };
     if (e.red && typeof e.red === 'object') [1, 2, 3, 4].forEach(k => {
       const d = e.red['b' + k], n = limpiarNodo(d);
       if (!n) return;
       n.simulado = d.simulado === true;
+      n.red = true;
+      n.atrasoRed = numero(e.red.pasarela && e.red.pasarela.hora) - n.hora;
       n.calidad = numero(d.calidad);
       if (e.red.pasarela && typeof e.red.pasarela === 'object') { n.wifi_red = typeof e.red.pasarela.wifi_red === 'string' ? e.red.pasarela.wifi_red.slice(0, 32) : ''; n.rssi_wifi = numero(e.red.pasarela.rssi_wifi); n.wifi_hora = numero(e.red.pasarela.hora); }
       r['red:b' + k] = n;
@@ -1166,7 +1176,7 @@
       medida('Última recepción', x.ultimaMs ? '<b style="font-size:14.5px">' + ultimoDatoTexto(x) + '</b>' : noDisp('Sin datos'), x.ultimaMs ? fechaHora(x.ultimaMs) : ''),
     ].join(''));
     if (x.real && x.c.red) {
-      const papel = x.c.red === 1 ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo · hueco ' + (x.c.red - 1) + ' del ciclo de 1 s';
+      const papel = x.c.red === 1 ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo · hueco ' + (x.c.red - 1) + ' del ciclo de 0,5 s';
       poner('fi-ajustes', fila('Papel', papel) + fila('Wi-Fi de la pasarela', textoWifi(x.d)) +
         fila('Enlace LoRa', x.c.red === 1 ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) + fila('Posición', suave('Sin posición')));
     } else if (x.real && x.c.sinLora) {
