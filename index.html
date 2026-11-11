@@ -260,7 +260,7 @@
   <div id="aviso-demo" class="aviso aviso-demo" hidden><span><span class="marca-demo">DEMO</span> Hay datos simulados en pantalla</span><button class="boton" type="button" data-demo-cambiar>Desactivar</button></div>
 
   <main id="v-inicio" class="vista">
-    <div class="pagina"><h1>Panel de control</h1><a class="boton principal" id="otra-version">Probar la versión 2</a></div>
+    <div class="pagina"><h1>Panel de control</h1></div>
     <div class="kpis" id="ini-kpis"></div>
     <section class="panel buscador" style="margin-bottom:12px">
       <label for="buscar-ini">Buscar batería</label>
@@ -1495,7 +1495,6 @@
     if (lista.length === 1) ir('ficha', lista[0].id); else ir('baterias');
     $('buscar-ini').value = '';
   });
-  $('otra-version').href = 'v2.html' + location.hash;
   $('ir-inicio').onclick = () => { if (vista !== 'inicio') ir('inicio'); };
   $('fi-gps').onclick = () => ir('mapa', null, { id: actual });
   $('aj-demo').onclick = () => cambiarDemo(!modoDemo);
