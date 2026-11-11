@@ -9,7 +9,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Baterías">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' https://unpkg.com; script-src 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icono-192.png">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; manifest-src 'self'; style-src 'unsafe-inline' https://unpkg.com; script-src 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
 <title>Monitor de baterías</title>
 <style>
   :root { color-scheme:dark; --fondo:#070f1c; --panel:#121e2e; --panel2:#1b2a3c; --panel3:#24364b; --linea:#2c3e53; --texto:#eaf0f6; --suave:#a3b3c5; --verde:#3ddc84; --verde-f:rgba(61,220,132,.14); --naranja:#ffa62b; --naranja-f:rgba(255,166,43,.15); --rojo:#ff6468; --rojo-f:rgba(255,100,104,.16); --turquesa:#2fd6d6; --turquesa-f:rgba(47,214,214,.13); --serie:#3d97e6; --banda:rgba(163,179,197,.26); --rejilla:rgba(255,255,255,.09); --foto:.1; --sobre:#07131f; }
@@ -366,7 +368,13 @@
   // Solo lectura: esta página no escribe nada en la base de datos
   const BASE = 'https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app/v/';
   const CONECTADO_MS = 35000, PERDIDA_MS = 600000, CADA_MS = 2000, CADA_DEMO_MS = 1000, REPASO_VUELTAS = 5;   // las placas suben datos cada 20 s
-  const CLAVE = location.hash.slice(1);   // la clave va tras el # y nunca llega al servidor de la página
+  // La clave va tras el # y nunca llega al servidor de la página. Se recuerda en este móvil para abrir
+  // la aplicación a pantalla completa desde el icono de inicio, que se abre sin el #.
+  const CLAVE = (() => {
+    const h = location.hash.slice(1);
+    try { if (h.length >= 24) localStorage.setItem('clave', h); else return localStorage.getItem('clave') || h; } catch (e) { /* sin almacenamiento solo vale el enlace */ }
+    return h;
+  })();
   const HAY_CLAVE = CLAVE.length >= 24;
   const $ = id => document.getElementById(id);
   let ultimo = null, vista = 'inicio', actual = null, FL = [];
