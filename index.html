@@ -438,9 +438,11 @@
   const flotaDeEnlace = enlace => FLOTA.find(c => c.nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase() === enlace);
   const flotaSinLora = () => Object.keys(ultimo || {}).filter(k => k.startsWith('nuevo:')).sort().map(k => ({ id: 'E-' + k.slice(6), nombre: ultimo[k].nombre, nodo: k, sinLora: true, conNombre: true, zona: (flotaDeEnlace(ultimo[k].enlace) || { zona: { id: 'E', nombre: 'Sin LoRa' } }).zona }));
   // Red por turnos de cuatro Heltec: BATERIA 1 es la pasarela con Wi-Fi. Cada una sale en cuanto sube datos.
-  const ZONA_RED = { id: 'R', nombre: 'Red por turnos', lat: 39.6690, lon: -0.2400, d: 0.0025 };
+  const ZONA_RED = FLOTA[0].zona;   // las cuatro Heltec están en el Polígono Canet
   const flotaRed = () => [1, 2, 3, 4].filter(n => ultimo && ultimo['red:b' + n]).map(n => ({ id: 'R-0' + n, nombre: 'Batería ' + n, nodo: 'red:b' + n, red: n, conNombre: true, zona: ZONA_RED }));
-  const flotaReal = () => FLOTA.concat(flotaSinLora(), flotaRed());
+  // Las placas de antes (sus Heltec ahora son la red por turnos) solo salen si han subido algo en los últimos 10 min
+  const reciente = c => ultimo && ultimo[c.nodo] && ultimo[c.nodo].hora && Date.now() - ultimo[c.nodo].hora < 600000;
+  const flotaReal = () => FLOTA.concat(flotaSinLora()).filter(reciente).concat(flotaRed());
   const AVISO_V = 3.0, CRITICO_V = 2.8, AVISO_V_ALTA = 3.6, CRITICO_V_ALTA = 3.65, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
   const AUX_CRITICO = 11.8, AUX_AVISO = 12.2, AUX_ALTA = 14.8, AUX_MUY_ALTA = 15.5;   // batería auxiliar de 12 V, como en la pantalla del coche
   const NOMBRES_TIPO = { tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
