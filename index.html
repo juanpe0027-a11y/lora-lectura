@@ -715,6 +715,7 @@
       n.red = true;
       n.atrasoRed = numero(e.red.pasarela && e.red.pasarela.hora) - n.hora;
       n.calidad = numero(d.calidad);
+      n.pasarelaRpi = !!(e.red.pasarela && e.red.pasarela.tipo === 'raspberry');
       if (e.red.pasarela && typeof e.red.pasarela === 'object') { n.wifi_red = typeof e.red.pasarela.wifi_red === 'string' ? e.red.pasarela.wifi_red.slice(0, 32) : ''; n.rssi_wifi = numero(e.red.pasarela.rssi_wifi); n.wifi_hora = numero(e.red.pasarela.hora); }
       r['red:b' + k] = n;
     });
@@ -1083,9 +1084,10 @@
       medida('Última recepción', x.ultimaMs ? '<b style="font-size:14.5px">' + ultimoDatoTexto(x) + '</b>' : noDisp('Sin datos'), x.ultimaMs ? fechaHora(x.ultimaMs) : ''),
     ].join(''));
     if (x.real && x.c.red) {
-      const papel = x.c.red === 1 ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo · hueco ' + (x.c.red - 1) + ' del ciclo de 0,5 s';
+      const rpi = !!(x.d && x.d.pasarelaRpi), esPasarela = x.c.red === 1 && !rpi;
+      const papel = esPasarela ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo · hueco ' + (rpi ? x.c.red : x.c.red - 1) + ' del ciclo de 0,5 s' + (rpi ? ' · pasarela Raspberry + RAK2287' : '');
       poner('fi-ajustes', fila('Papel', papel) + fila('Wi-Fi de la pasarela', textoWifi(x.d)) +
-        fila('Enlace LoRa', x.c.red === 1 ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
+        fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
         fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')));
     } else if (x.real && x.c.sinLora) {
