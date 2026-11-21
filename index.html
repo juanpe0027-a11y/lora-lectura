@@ -14,8 +14,8 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; manifest-src 'self'; style-src 'unsafe-inline' https://unpkg.com; script-src 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
 <title>Monitor de baterías</title>
 <style>
-  :root { color-scheme:dark; --fondo:#070f1c; --panel:#121e2e; --panel2:#1b2a3c; --panel3:#24364b; --linea:#2c3e53; --texto:#eaf0f6; --suave:#a3b3c5; --verde:#3ddc84; --verde-f:rgba(61,220,132,.14); --naranja:#ffa62b; --naranja-f:rgba(255,166,43,.15); --rojo:#ff6468; --rojo-f:rgba(255,100,104,.16); --turquesa:#2fd6d6; --turquesa-f:rgba(47,214,214,.13); --serie:#3d97e6; --banda:rgba(163,179,197,.26); --rejilla:rgba(255,255,255,.09); --foto:.1; --sobre:#07131f; }
-  :root[data-tema="claro"] { color-scheme:light; --fondo:#e9eef4; --panel:#ffffff; --panel2:#f0f4f8; --panel3:#e2e9f0; --linea:#ccd6e1; --texto:#0f1c2c; --suave:#4c5d73; --verde:#0a7a44; --verde-f:rgba(10,122,68,.11); --naranja:#a85600; --naranja-f:rgba(168,86,0,.11); --rojo:#c4262e; --rojo-f:rgba(196,38,46,.1); --turquesa:#07767d; --turquesa-f:rgba(7,118,125,.1); --serie:#1a6fc2; --banda:rgba(76,93,115,.2); --rejilla:rgba(15,28,44,.1); --foto:.05; --sobre:#ffffff; }
+  :root { color-scheme:dark; --fondo:#070f1c; --panel:#121e2e; --panel2:#1b2a3c; --panel3:#24364b; --linea:#2c3e53; --texto:#eaf0f6; --suave:#a3b3c5; --verde:#3ddc84; --verde-f:rgba(61,220,132,.14); --naranja:#ffa62b; --naranja-f:rgba(255,166,43,.15); --rojo:#ff6468; --rojo-f:rgba(255,100,104,.16); --turquesa:#2fd6d6; --turquesa-f:rgba(47,214,214,.13); --serie:#3d97e6; --banda:rgba(163,179,197,.26); --rejilla:rgba(255,255,255,.09); --foto:.1; --sobre:#07131f; --wifi:#b88cff; --wifi-f:rgba(184,140,255,.14); }
+  :root[data-tema="claro"] { color-scheme:light; --fondo:#e9eef4; --panel:#ffffff; --panel2:#f0f4f8; --panel3:#e2e9f0; --linea:#ccd6e1; --texto:#0f1c2c; --suave:#4c5d73; --verde:#0a7a44; --verde-f:rgba(10,122,68,.11); --naranja:#a85600; --naranja-f:rgba(168,86,0,.11); --rojo:#c4262e; --rojo-f:rgba(196,38,46,.1); --turquesa:#07767d; --turquesa-f:rgba(7,118,125,.1); --serie:#1a6fc2; --banda:rgba(76,93,115,.2); --rejilla:rgba(15,28,44,.1); --foto:.05; --sobre:#ffffff; --wifi:#7a3fd1; --wifi-f:rgba(122,63,209,.1); }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   [hidden] { display:none !important; }
   body { margin:0; min-height:100vh; background:var(--fondo); color:var(--texto); font:15.5px/1.45 "Segoe UI Variable Text","Segoe UI",Roboto,system-ui,-apple-system,sans-serif; }
@@ -26,7 +26,7 @@
   :focus-visible { outline:2px solid var(--turquesa); outline-offset:2px; }
   .icono { width:20px; height:20px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
   .num { font-variant-numeric:tabular-nums; }
-  .c-verde { color:var(--verde); } .c-naranja { color:var(--naranja); } .c-rojo { color:var(--rojo); } .c-suave { color:var(--suave); } .c-lora { color:var(--turquesa); }
+  .c-verde { color:var(--verde); } .c-naranja { color:var(--naranja); } .c-rojo { color:var(--rojo); } .c-suave { color:var(--suave); } .c-lora { color:var(--turquesa); } .c-wifi { color:var(--wifi); }
 
   /* Estructura: barra inferior en el móvil, menú lateral en el ordenador */
   .cab { position:sticky; top:0; z-index:1100; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:calc(8px + env(safe-area-inset-top)) 14px 8px; background:var(--panel); border-bottom:1px solid var(--linea); }
@@ -154,6 +154,7 @@
   .celda small { display:block; color:var(--suave); font-size:11px; }
   .celda span { font-weight:650; font-size:13.5px; }
   .celda i { position:absolute; left:0; bottom:0; height:3px; background:var(--verde); transition:width .4s; }
+  .celda.wifi { background:var(--wifi-f); } .celda.wifi span { color:var(--wifi); } .celda.wifi i { background:var(--wifi); }
   .celda.n1 { background:var(--naranja-f); } .celda.n1 span { color:var(--naranja); } .celda.n1 i { background:var(--naranja); }
   .celda.n2 { background:var(--rojo-f); } .celda.n2 span { color:var(--rojo); } .celda.n2 i { background:var(--rojo); }
   .celda em { position:absolute; bottom:8px; right:6px; color:var(--suave); font-style:normal; font-size:10px; font-weight:700; }
@@ -719,7 +720,7 @@
       n.pasarelaRpi = !!(e.red.pasarela && e.red.pasarela.tipo === 'raspberry');
       if (k === 2 && canB2 && !n.simulado) {
         n.celdas = canB2.celdas;
-        if (canB2.sondas) { n.bms = n.bms || {}; canB2.sondas.forEach((v, i) => { n.bms['t_sonda' + (i + 1)] = v; }); }
+        n.wifiCan = canB2;
       }
       if (e.red.pasarela && typeof e.red.pasarela === 'object') { n.wifi_red = typeof e.red.pasarela.wifi_red === 'string' ? e.red.pasarela.wifi_red.slice(0, 32) : ''; n.rssi_wifi = numero(e.red.pasarela.rssi_wifi); n.wifi_hora = numero(e.red.pasarela.hora); }
       r['red:b' + k] = n;
@@ -735,12 +736,16 @@
     try {
       const [ids, est] = await Promise.all(['ids', 'estado'].map(k => fetch(BASE + encodeURIComponent(CLAVE) + '/can/' + k + '.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)));
       const trama = k => ids && ids[k] && typeof ids[k].d === 'string' && /^[0-9A-F]{16}$/.test(ids[k].d) && numero(ids[k].hace_s) < 10 ? ids[k].d : null;
-      const a = trama('0AA36000'), b = trama('0AA36001'), s = trama('0AB36000'), hora = est ? numero(est.hora) : 0;
+      const a = trama('0AA36000'), b = trama('0AA36001'), s = trama('0AB36000'), bal = trama('0AC36000'), hora = est ? numero(est.hora) : 0;
       const palabra = (h, i) => parseInt(h.substr(i * 4, 4), 16);
+      const decimas = (k, i) => { const h = trama(k); return h ? palabra(h, i) / 10 : null; };
       const antes = JSON.stringify(canB2);
       canB2 = a && b && hora && Date.now() - hora < 15000 ? {
         celdas: [0, 1, 2, 3].map(i => palabra(a, i) / 1000).concat([0, 1, 2, 3].map(i => palabra(b, i) / 1000)),
         sondas: s ? [0, 1, 2].map(i => palabra(s, i) / 100) : null,
+        // Balanceo: un bit por celda (sin confirmar; ahora no balancea ninguna)
+        balanceo: bal ? [0, 1, 2, 3, 4, 5, 6, 7].filter(i => parseInt(bal.substr(0, 2), 16) >> i & 1).map(i => i + 1) : null,
+        vPack: decimas('350', 1), vCarga: decimas('360', 1), vDescarga: decimas('370', 1),
       } : null;
       if (JSON.stringify(canB2) !== antes && crudo) recibido();
     } catch (err) { canB2 = null; }
@@ -1060,7 +1065,6 @@
   // Datos del BMS por CAN (mensajes 0x200 a 0x480, como las placas 4G). Se muestran como llegan del BMS.
   const CAMPOS_BMS = [
     ['Resumen (0x200 · 0x202)', [['corriente_media', 'Corriente media', 'A', 1], ['v_celda_media', 'Tensión media de celda', 'mV'], ['celdas', 'Número de celdas'], ['capacidad', 'Capacidad'], ['soh', 'Salud (SoH)', '%'], ['error', 'Estado de error'], ['pines', 'Estado de pines'], ['t_max_esclavo', 'Temperatura máx. esclavo', 'ºC'], ['t_min_esclavo', 'Temperatura mín. esclavo', 'ºC'], ['eth', 'E_T_H'], ['etl', 'E_T_L']]],
-    ['Temperatura de cada sensor', [['t_sonda1', 'Sensor 1', 'ºC', 1], ['t_sonda2', 'Sensor 2', 'ºC', 1], ['t_sonda3', 'Sensor 3', 'ºC', 1]]],
     ['Celdas (0x204)', [['v_celda_max', 'Celda más alta', 'mV'], ['celda_alta', 'Nº celda más alta'], ['v_celda_min', 'Celda más baja', 'mV'], ['celda_baja', 'Nº celda más baja'], ['delta', 'Diferencia', 'mV'], ['v_celda_max_pico', 'Pico de celda máx.', 'mV'], ['v_celda_min_pico', 'Pico de celda mín.', 'mV'], ['t_celda_max', 'Temperatura celda máx.', 'ºC'], ['t_celda_min', 'Temperatura celda mín.', 'ºC'], ['pico_carga', 'Pico de carga', 'A', 1], ['pico_descarga', 'Pico de descarga', 'A', 1]]],
     ['Funcionamiento (0x380 · 0x394)', [['modo', 'Modo de funcionamiento'], ['t_pdmu1', 'Temperatura PDMU 1', 'ºC'], ['t_pdmu2', 'Temperatura PDMU 2', 'ºC'], ['t_pdmu3', 'Temperatura PDMU 3', 'ºC'], ['bmu_paralelo', 'BMU en paralelo'], ['t_max_id', 'Celda de temp. máx.'], ['t_min_id', 'Celda de temp. mín.'], ['t_cmu_max', 'Temperatura CMU máx.', 'ºC'], ['t_cmu_min', 'Temperatura CMU mín.', 'ºC'], ['soc_ocv', 'SoC por OCV', '%'], ['cmu_encontradas', 'CMU encontradas']]],
     ['Protecciones (0x390 · 0x392)', [['uvpc', 'UVPC'], ['ovpc', 'OVPC'], ['utpc', 'UTPC'], ['otpc', 'OTPC'], ['ocpc', 'OCPC'], ['mmcc', 'MMCC'], ['mmdc', 'MMDC'], ['max_ct', 'Temp. máx. celda'], ['min_ct', 'Temp. mín. celda']]],
@@ -1131,6 +1135,17 @@
       fila('Carga (SoC)', nv(socTexto(x) || '—')) + fila('Salud (SoH)', nv(x.soh !== null && x.soh !== undefined ? Math.round(x.soh) + ' %' : '—')) +
       fila('Temperatura máxima', nv(x.temp !== null && x.temp !== undefined ? decimal(x.temp, 1) + ' ºC' : '—'));
     if (x.aux) filasBms += fila('Batería auxiliar', decimal(x.aux.voltios, 2) + ' V') + fila('Relé', x.aux.rele ? 'Activado' : 'Desactivado');
+    const w = x.d && x.d.wifiCan;
+    if (w) {
+      const m = v => '<span class="c-wifi">' + v + '</span>';
+      filasBms += '<div class="fila"><b class="c-wifi">Directo del CAN por Wi-Fi</b><span class="val">' + m('en morado') + '</span></div>' +
+        fila('Celdas', m(w.celdas.length + ' celdas, de ' + decimal(Math.min(...w.celdas), 3) + ' a ' + decimal(Math.max(...w.celdas), 3) + ' V')) +
+        (w.sondas ? w.sondas.map((v, i) => fila('Sensor de temperatura ' + (i + 1), m(decimal(v, 1) + ' ºC'))).join('') : '') +
+        (w.balanceo ? fila('Balanceando', m(w.balanceo.length ? 'Celdas ' + w.balanceo.join(', ') : 'Ninguna')) : '') +
+        (w.vPack !== null ? fila('Tensión del pack (0x350)', m(decimal(w.vPack, 1) + ' V')) : '') +
+        (w.vCarga !== null ? fila('Tensión máxima de carga (0x360)', m(decimal(w.vCarga, 1) + ' V')) : '') +
+        (w.vDescarga !== null ? fila('Tensión mínima de descarga (0x370)', m(decimal(w.vDescarga, 1) + ' V')) : '');
+    }
     if (x.d && x.d.bms && Object.keys(x.d.bms).length) filasBms += filasBmsCan(x.d.bms);
     poner('fi-bms', filasBms);
 
@@ -1143,9 +1158,9 @@
     const dif = r.vMax - r.vMin, cMax = x.celdas.indexOf(r.vMax) + 1, cMin = x.celdas.indexOf(r.vMin) + 1;
     poner('fi-resumen', '<div><small>Tensión máxima</small><b>' + decimal(r.vMax, 3) + ' V</b> ' + suave('celda ' + cMax) + '</div><div><small>Tensión mínima</small><b>' + decimal(r.vMin, 3) + ' V</b> ' + suave('celda ' + cMin) + '</div><div><small>Diferencia</small><b>' + Math.round(dif * 1000) + ' mV</b></div><div><small>Equilibrio</small><b class="' + (dif > DESEQ_V ? 'c-naranja' : 'c-verde') + '">' + (dif > DESEQ_V ? 'Desequilibrada' : 'Correcto') + '</b></div>');
     const bajo = Math.min(r.vMin, CRITICO_V), rango = Math.max(0.01, Math.max(r.vMax, AVISO_V) - bajo);
-    poner('fi-celdas', x.celdas.map((v, i) => '<button class="celda n' + (v < CRITICO_V || v >= CRITICO_V_ALTA ? 2 : v < AVISO_V || v >= AVISO_V_ALTA ? 1 : 0) + (i === celdaGraf ? ' elegida' : '') + '" type="button" data-celda="' + i + '" aria-pressed="' + (i === celdaGraf) + '"><small>Celda ' + (i + 1) + '</small><span>' + decimal(v, 3) + '</span><i style="width:' + Math.round((v - bajo) / rango * 100) + '%"></i>' + (i === cMax - 1 ? '<em>MÁX</em>' : i === cMin - 1 ? '<em>MÍN</em>' : '') + '</button>').join(''));
+    poner('fi-celdas', x.celdas.map((v, i) => '<button class="celda' + (x.d && x.d.wifiCan ? ' wifi' : '') + ' n' + (v < CRITICO_V || v >= CRITICO_V_ALTA ? 2 : v < AVISO_V || v >= AVISO_V_ALTA ? 1 : 0) + (i === celdaGraf ? ' elegida' : '') + '" type="button" data-celda="' + i + '" aria-pressed="' + (i === celdaGraf) + '"><small>Celda ' + (i + 1) + '</small><span>' + decimal(v, 3) + '</span><i style="width:' + Math.round((v - bajo) / rango * 100) + '%"></i>' + (i === cMax - 1 ? '<em>MÁX</em>' : i === cMin - 1 ? '<em>MÍN</em>' : '') + '</button>').join(''));
     poner('fi-rangos', botonesRango(rangoCelda, 'data-rango'));
-    poner('fi-leyenda', '<span>' + RANGOS[rangoCelda].titulo + (x.real ? '' : ' · simulado') + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>');
+    poner('fi-leyenda', '<span>' + RANGOS[rangoCelda].titulo + (x.real ? '' : ' · simulado') + (x.d && x.d.wifiCan ? ' · <span class="c-wifi">celdas por Wi-Fi</span>' : '') + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>');
     pintarGraficaCelda(x);
   }
   async function pintarGraficaCelda(x) {
