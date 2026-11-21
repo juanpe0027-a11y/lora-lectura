@@ -154,6 +154,15 @@
   .celda small { display:block; color:var(--suave); font-size:11px; }
   .celda span { font-weight:650; font-size:13.5px; }
   .celda i { position:absolute; left:0; bottom:0; height:3px; background:var(--verde); transition:width .4s; }
+  .mapa-calor { display:grid; gap:2px; margin-top:10px; align-items:center; font-variant-numeric:tabular-nums; }
+  .mapa-calor .et { background:none; border:0; color:var(--suave); font:inherit; font-size:11px; text-align:right; padding:0 6px 0 0; cursor:pointer; }
+  .mapa-calor .et.elegida { color:var(--texto); font-weight:650; }
+  .mapa-calor i { display:block; height:14px; border-radius:2px; cursor:pointer; }
+  .mapa-calor i.sel { box-shadow:0 0 0 1.5px var(--texto); }
+  .mapa-calor .ejes { grid-column:2 / -1; display:flex; justify-content:space-between; color:var(--suave); font-size:11px; margin-top:4px; }
+  .leyenda-calor { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px; font-size:12px; color:var(--suave); }
+  .leyenda-calor span { display:inline-flex; align-items:center; gap:5px; }
+  .leyenda-calor b { width:16px; height:11px; border-radius:2px; display:inline-block; }
   .celda.wifi { background:var(--wifi-f); } .celda.wifi span { color:var(--wifi); } .celda.wifi i { background:var(--wifi); }
   .celda.n1 { background:var(--naranja-f); } .celda.n1 span { color:var(--naranja); } .celda.n1 i { background:var(--naranja); }
   .celda.n2 { background:var(--rojo-f); } .celda.n2 span { color:var(--rojo); } .celda.n2 i { background:var(--rojo); }
@@ -319,6 +328,13 @@
           <p class="pista">Pulsa una celda para ver su línea en la gráfica.</p>
           <div class="celdas" id="fi-celdas"></div>
         </div>
+      </section>
+      <section class="panel" aria-labelledby="t-caida" id="ca-panel">
+        <div class="titulo"><h2 id="t-caida">Caída de cada celda bajo carga</h2></div>
+        <p class="pista" id="ca-nota"></p>
+        <div class="mapa-calor" id="ca-mapa"></div>
+        <div class="leyenda-calor" id="ca-leyenda"></div>
+        <p class="pista" id="ca-detalle"></p>
       </section>
     </div>
   </main>
@@ -575,6 +591,18 @@
       r.onblocked = () => ok(null);
     });
   }
+  // Cuánto se queda cada celda por debajo de la mediana de todas (mV); "bajo carga" = descargando más de DESCARGA_A
+  const DESCARGA_A = 1;
+  function separacionCeldas(c) {
+    const o = c.slice().sort((a, b) => a - b), m = o.length % 2 ? o[(o.length - 1) / 2] : (o[o.length / 2 - 1] + o[o.length / 2]) / 2;
+    return c.map(v => Math.max(0, (m - v) * 1000));
+  }
+  function mezclarCeldas(h, k, v) {
+    const n = h[k + '_n'] || 0;
+    if (!Array.isArray(h[k]) || h[k].length !== v.length) { h[k] = v.slice(); h[k + '_n'] = 1; return; }
+    h[k] = h[k].map((a, i) => (a * n + v[i]) / (n + 1));
+    h[k + '_n'] = n + 1;
+  }
   function guardarPaquete(p) {
     recientes.unshift(p);
     if (recientes.length > 2000) recientes.pop();
@@ -595,6 +623,11 @@
           h[c] = ((h[c] || 0) * n + p[c]) / (n + 1);
           h[c + '_n'] = n + 1;
         });
+        if (p.c) {
+          const sep = separacionCeldas(p.c);
+          mezclarCeldas(h, 'desv', sep);
+          if (p.i !== null && p.i !== undefined && p.i < -DESCARGA_A) mezclarCeldas(h, 'caida', sep);
+        }
         if (p.vmin !== undefined) { h.vmin = Math.min(h.vmin === undefined ? p.vmin : h.vmin, p.vmin); h.vmax = Math.max(h.vmax === undefined ? p.vmax : h.vmax, p.vmax); }
         horas.put(h);
       };
@@ -671,7 +704,7 @@
       const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: c.red === 1 ? 'Pasarela' : c.red ? 'LoRa por turnos' : c.sinLora ? 'ESP-NOW' : directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
       if (d.celdas) { p.c = d.celdas; p.vmin = Math.min(...d.celdas); p.vmax = Math.max(...d.celdas); p.tension = d.celdas.reduce((a, v) => a + v, 0); }
       if (p.tension === null && aux && aux.hora && conectado(aux)) p.tension = aux.voltios;
-      p.soc = opcional(d.soc); p.temp = opcional(d.temp);
+      p.soc = opcional(d.soc); p.temp = opcional(d.temp); p.i = opcional(d.corriente);
       guardarPaquete(p);
     });
   }
@@ -1153,6 +1186,7 @@
     $('fi-sin-celdas').hidden = !!x.celdas;
     $('fi-con-celdas').hidden = !x.celdas;
     $('fi-rangos').hidden = !x.celdas;
+    $('ca-panel').hidden = !x.celdas;
     if (!x.celdas) return;
     if (celdasDe !== x.id) { celdasDe = x.id; celdaGraf = x.celdas.indexOf(r.vMin); }
     const dif = r.vMax - r.vMin, cMax = x.celdas.indexOf(r.vMax) + 1, cMin = x.celdas.indexOf(r.vMin) + 1;
@@ -1162,6 +1196,70 @@
     poner('fi-rangos', botonesRango(rangoCelda, 'data-rango'));
     poner('fi-leyenda', '<span>' + RANGOS[rangoCelda].titulo + (x.real ? '' : ' · simulado') + (x.d && x.d.wifiCan ? ' · <span class="c-wifi">celdas por Wi-Fi</span>' : '') + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>');
     pintarGraficaCelda(x);
+    pintarCaida(x);
+  }
+  const TRAMOS_CAIDA = [[5, 'var(--panel3)', '< 5'], [10, '#5b4250', '5-10'], [20, '#8f4b33', '10-20'], [35, '#c8662b', '20-35'], [60, '#f5913a', '35-60'], [Infinity, '#ff5b4d', '> 60']];
+  let caidaSel = null, tokenCaida = 0, caidaClave = '', caidaHora = 0, caidaUltima = null;
+  function caidaDemo(x, cols) {
+    const s = semilla(x.id), n = x.celdas.length, mala = s % n, regular = (s * 7 + 3) % n, floja = (s * 13 + 5) % n;
+    return Array.from({ length: cols }, (_, j) => x.celdas.map((v, i) => {
+      const base = i === mala ? 70 : i === regular ? 14 : i === floja ? 7 : 1.5;
+      return Math.max(0, base * (1 + ruido(s + i, j, 3) * 0.5) + (ruido(s, i, j) > 0.42 ? 6 : 0));
+    }));
+  }
+  async function pintarCaida(x) {
+    const R = RANGOS[rangoCelda], n = x.celdas.length, cols = R.n;
+    const clave = x.id + '|' + rangoCelda + '|' + n + '|' + caidaSel + '|' + celdaGraf;
+    if (clave === caidaClave && Date.now() - caidaHora < 5000) return;
+    caidaClave = clave; caidaHora = Date.now();
+    const hasta = Date.now(), desde = hasta - R.ms, token = ++tokenCaida;
+    let matriz, conCarga = true;
+    if (x.real) {
+      const filas = await leerFilas(R.tabla, x.id, desde);
+      if (token !== tokenCaida) return;
+      const porHora = R.tabla === 'horas';
+      const deCarga = f => porHora ? Array.isArray(f.caida) && f.caida.length === n : !!f.c && f.c.length === n && f.i !== null && f.i !== undefined && f.i < -DESCARGA_A;
+      conCarga = filas.some(deCarga);
+      const valores = f => porHora ? (conCarga ? (deCarga(f) ? f.caida : null) : (Array.isArray(f.desv) && f.desv.length === n ? f.desv : null))
+        : (f.c && f.c.length === n && (!conCarga || deCarga(f)) ? separacionCeldas(f.c) : null);
+      const suma = Array.from({ length: cols }, () => new Array(n).fill(0)), cuenta = new Array(cols).fill(0);
+      filas.forEach(f => {
+        const v = valores(f);
+        if (!v) return;
+        const j = Math.min(cols - 1, Math.max(0, Math.floor((f.t - desde) / R.ms * cols)));
+        v.forEach((a, i) => { suma[j][i] += a; });
+        cuenta[j]++;
+      });
+      matriz = suma.map((fila, j) => cuenta[j] ? fila.map(a => a / cuenta[j]) : null);
+    } else matriz = caidaDemo(x, cols);
+    caidaUltima = { matriz, desde, paso: R.ms / cols, rango: rangoCelda, n };
+    $('t-caida').textContent = conCarga ? 'Caída de cada celda bajo carga' : 'Separación de cada celda';
+    poner('ca-nota', (conCarga ? 'Cuánto baja cada celda respecto a las demás al descargar (mV).' : 'Todavía no hay descargas con corriente medida: se muestra cuánto se queda cada celda por debajo de las demás en todas las medidas (mV).') +
+      ' Cuanto más cálido, peor. <b>Toca un momento para ver el detalle</b>; toca el nombre de la celda (C1, C2...) para ver su historial.' +
+      (x.real ? ' ' + suave('Se acumula en este dispositivo mientras la web está abierta.') : ' ' + suave('Simulado.')));
+    const color = v => TRAMOS_CAIDA.find(tr => v < tr[0])[1];
+    let h = '';
+    for (let i = 0; i < n; i++) {
+      h += '<button class="et' + (i === celdaGraf ? ' elegida' : '') + '" type="button" data-caida-celda="' + i + '">C' + (i + 1) + '</button>';
+      for (let j = 0; j < cols; j++) {
+        const v = matriz[j] ? matriz[j][i] : null;
+        h += '<i data-caida-col="' + j + '"' + (j === caidaSel ? ' class="sel"' : '') + ' style="background:' + (v === null ? 'transparent' : color(v)) + '"></i>';
+      }
+    }
+    h += '<div class="ejes">' + [0, 1, 2, 3].map(k => '<span>' + fechaGraf(desde + R.ms * k / 3, rangoCelda) + '</span>').join('') + '</div>';
+    const caja = $('ca-mapa');
+    caja.style.gridTemplateColumns = '34px repeat(' + cols + ', minmax(0, 1fr))';
+    caja.innerHTML = h;
+    poner('ca-leyenda', TRAMOS_CAIDA.map(tr => '<span><b style="background:' + tr[1] + '"></b>' + tr[2] + '</span>').join('') + '<span>mV</span>');
+    pintarDetalleCaida();
+  }
+  function pintarDetalleCaida() {
+    const u = caidaUltima;
+    if (!u || caidaSel === null || caidaSel >= u.matriz.length) { poner('ca-detalle', ''); return; }
+    const fila = u.matriz[caidaSel], cuando = fechaGraf(u.desde + u.paso * caidaSel, u.rango, true);
+    if (!fila) { poner('ca-detalle', '<b>' + cuando + '</b> · sin medidas en ese momento.'); return; }
+    const malas = fila.map((v, i) => [v, i]).filter(p => p[0] >= 5).sort((a, b) => b[0] - a[0]);
+    poner('ca-detalle', '<b>' + cuando + '</b> · ' + (malas.length ? malas.map(p => 'C' + (p[1] + 1) + ' ' + Math.round(p[0]) + ' mV').join(', ') : 'todas las celdas por debajo de 5 mV'));
   }
   async function pintarGraficaCelda(x) {
     if (!graficaCelda) graficaCelda = crearGrafica($('fi-grafica'));
@@ -1549,7 +1647,7 @@
   });
 
   document.addEventListener('click', ev => {
-    const el = ev.target.closest('[data-volver],[data-ir],[data-ficha],[data-rango],[data-celda],[data-gr-rango],[data-filtro-bat],[data-filtro-mapa],[data-modo-alarmas],[data-tema],[data-demo-cambiar],[data-demo-fallo],[data-demo-corte],[data-demo-reiniciar],[data-buscar-zona]');
+    const el = ev.target.closest('[data-volver],[data-ir],[data-ficha],[data-rango],[data-celda],[data-caida-celda],[data-caida-col],[data-gr-rango],[data-filtro-bat],[data-filtro-mapa],[data-modo-alarmas],[data-tema],[data-demo-cambiar],[data-demo-fallo],[data-demo-corte],[data-demo-reiniciar],[data-buscar-zona]');
     if (!el) return;
     const D = el.dataset;
     if ('volver' in D) history.back();
@@ -1557,6 +1655,8 @@
     else if (D.ficha) ir('ficha', D.ficha);
     else if (D.rango) { rangoCelda = D.rango; pintarFicha(); }
     else if (D.celda) { celdaGraf = Number(D.celda); pintarFicha(); }
+    else if (D.caidaCelda) { celdaGraf = Number(D.caidaCelda); pintarFicha(); $('t-celdas').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    else if (D.caidaCol) { caidaSel = Number(D.caidaCol) === caidaSel ? null : Number(D.caidaCol); pintarFicha(); }
     else if (D.grRango) { grRango = D.grRango; ultimaCarga = 0; pintarVista(); }
     else if (D.filtroBat) { filtroBat = D.filtroBat; pintarBaterias(); }
     else if (D.filtroMapa) { filtroMapa = D.filtroMapa; pintarMapa(); }
