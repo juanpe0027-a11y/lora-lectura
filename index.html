@@ -159,6 +159,8 @@
   .mapa-calor .et.elegida { color:var(--texto); font-weight:650; }
   .mapa-calor i { display:block; height:14px; border-radius:2px; cursor:pointer; }
   .mapa-calor i.sel { box-shadow:0 0 0 1.5px var(--texto); }
+  .mapa-calor i.alta { box-shadow:0 0 0 2px var(--verde); } .mapa-calor i.baja { box-shadow:0 0 0 2px var(--rojo); }
+  .mapa-calor .et.alta { color:var(--verde); font-weight:650; } .mapa-calor .et.baja { color:var(--rojo); font-weight:650; }
   .mapa-calor .ejes { grid-column:2 / -1; display:flex; justify-content:space-between; color:var(--suave); font-size:11px; margin-top:4px; }
   .leyenda-calor { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px; font-size:12px; color:var(--suave); }
   .leyenda-calor span { display:inline-flex; align-items:center; gap:5px; }
@@ -626,6 +628,7 @@
         if (p.c) {
           const sep = separacionCeldas(p.c);
           mezclarCeldas(h, 'desv', sep);
+          mezclarCeldas(h, 'volt', p.c);
           if (p.i !== null && p.i !== undefined && p.i < -DESCARGA_A) mezclarCeldas(h, 'caida', sep);
         }
         if (p.vmin !== undefined) { h.vmin = Math.min(h.vmin === undefined ? p.vmin : h.vmin, p.vmin); h.vmax = Math.max(h.vmax === undefined ? p.vmax : h.vmax, p.vmax); }
@@ -1207,6 +1210,10 @@
       return Math.max(0, base * (1 + ruido(s + i, j, 3) * 0.5) + (ruido(s, i, j) > 0.42 ? 6 : 0));
     }));
   }
+  function voltDemo(x, matriz) {
+    const s = semilla(x.id), o = x.celdas.slice().sort((a, b) => a - b), m = o[Math.floor(o.length / 2)];
+    return matriz.map((fila, j) => fila.map((d, i) => m + ruido(s + i, j, 9) * 0.006 - d / 1000));
+  }
   async function pintarCaida(x) {
     const R = RANGOS[rangoCelda], n = x.celdas.length, cols = R.n;
     const clave = x.id + '|' + rangoCelda + '|' + n + '|' + caidaSel + '|' + celdaGraf;
@@ -1223,16 +1230,23 @@
       const valores = f => porHora ? (conCarga ? (deCarga(f) ? f.caida : null) : (Array.isArray(f.desv) && f.desv.length === n ? f.desv : null))
         : (f.c && f.c.length === n && (!conCarga || deCarga(f)) ? separacionCeldas(f.c) : null);
       const suma = Array.from({ length: cols }, () => new Array(n).fill(0)), cuenta = new Array(cols).fill(0);
+      const sumaV = Array.from({ length: cols }, () => new Array(n).fill(0)), cuentaV = new Array(cols).fill(0);
       filas.forEach(f => {
+        const j = Math.min(cols - 1, Math.max(0, Math.floor((f.t - desde) / R.ms * cols)));
+        const volt = porHora ? (Array.isArray(f.volt) && f.volt.length === n ? f.volt : null) : (f.c && f.c.length === n ? f.c : null);
+        if (volt) { volt.forEach((a, i) => { sumaV[j][i] += a; }); cuentaV[j]++; }
         const v = valores(f);
         if (!v) return;
-        const j = Math.min(cols - 1, Math.max(0, Math.floor((f.t - desde) / R.ms * cols)));
         v.forEach((a, i) => { suma[j][i] += a; });
         cuenta[j]++;
       });
       matriz = suma.map((fila, j) => cuenta[j] ? fila.map(a => a / cuenta[j]) : null);
-    } else matriz = caidaDemo(x, cols);
-    caidaUltima = { matriz, desde, paso: R.ms / cols, rango: rangoCelda, n };
+      var tensiones = sumaV.map((fila, j) => cuentaV[j] ? fila.map(a => a / cuentaV[j]) : null);
+    } else { matriz = caidaDemo(x, cols); var tensiones = voltDemo(x, matriz); }
+    // La celda más alta y la más baja del momento elegido
+    const fv = caidaSel !== null && caidaSel < cols ? tensiones[caidaSel] : null;
+    const iAlta = fv ? fv.indexOf(Math.max(...fv)) : -1, iBaja = fv ? fv.indexOf(Math.min(...fv)) : -1;
+    caidaUltima = { matriz, tensiones, desde, paso: R.ms / cols, rango: rangoCelda, n };
     $('t-caida').textContent = conCarga ? 'Caída de cada celda bajo carga' : 'Separación de cada celda';
     poner('ca-nota', (conCarga ? 'Cuánto baja cada celda respecto a las demás al descargar (mV).' : 'Todavía no hay descargas con corriente medida: se muestra cuánto se queda cada celda por debajo de las demás en todas las medidas (mV).') +
       ' Cuanto más cálido, peor. <b>Toca un momento para ver el detalle</b>; toca el nombre de la celda (C1, C2...) para ver su historial.' +
@@ -1240,15 +1254,15 @@
     const color = v => TRAMOS_CAIDA.find(tr => v < tr[0])[1];
     let h = '';
     for (let i = 0; i < n; i++) {
-      h += '<button class="et' + (i === celdaGraf ? ' elegida' : '') + '" type="button" data-caida-celda="' + i + '">C' + (i + 1) + '</button>';
+      h += '<button class="et' + (i === iAlta ? ' alta' : i === iBaja ? ' baja' : i === celdaGraf ? ' elegida' : '') + '" type="button" data-caida-celda="' + i + '">' + (i === iAlta ? '▲ ' : i === iBaja ? '▼ ' : '') + 'C' + (i + 1) + '</button>';
       for (let j = 0; j < cols; j++) {
         const v = matriz[j] ? matriz[j][i] : null;
-        h += '<i data-caida-col="' + j + '"' + (j === caidaSel ? ' class="sel"' : '') + ' style="background:' + (v === null ? 'transparent' : color(v)) + '"></i>';
+        h += '<i data-caida-col="' + j + '"' + (j === caidaSel ? ' class="sel' + (i === iAlta ? ' alta' : i === iBaja ? ' baja' : '') + '"' : '') + ' style="background:' + (v === null ? 'transparent' : color(v)) + '"></i>';
       }
     }
     h += '<div class="ejes">' + [0, 1, 2, 3].map(k => '<span>' + fechaGraf(desde + R.ms * k / 3, rangoCelda) + '</span>').join('') + '</div>';
     const caja = $('ca-mapa');
-    caja.style.gridTemplateColumns = '34px repeat(' + cols + ', minmax(0, 1fr))';
+    caja.style.gridTemplateColumns = '46px repeat(' + cols + ', minmax(0, 1fr))';
     caja.innerHTML = h;
     poner('ca-leyenda', TRAMOS_CAIDA.map(tr => '<span><b style="background:' + tr[1] + '"></b>' + tr[2] + '</span>').join('') + '<span>mV</span>');
     pintarDetalleCaida();
@@ -1256,10 +1270,18 @@
   function pintarDetalleCaida() {
     const u = caidaUltima;
     if (!u || caidaSel === null || caidaSel >= u.matriz.length) { poner('ca-detalle', ''); return; }
-    const fila = u.matriz[caidaSel], cuando = fechaGraf(u.desde + u.paso * caidaSel, u.rango, true);
-    if (!fila) { poner('ca-detalle', '<b>' + cuando + '</b> · sin medidas en ese momento.'); return; }
-    const malas = fila.map((v, i) => [v, i]).filter(p => p[0] >= 5).sort((a, b) => b[0] - a[0]);
-    poner('ca-detalle', '<b>' + cuando + '</b> · ' + (malas.length ? malas.map(p => 'C' + (p[1] + 1) + ' ' + Math.round(p[0]) + ' mV').join(', ') : 'todas las celdas por debajo de 5 mV'));
+    const fila = u.matriz[caidaSel], tv = u.tensiones[caidaSel], cuando = fechaGraf(u.desde + u.paso * caidaSel, u.rango, true);
+    if (!fila && !tv) { poner('ca-detalle', '<b>' + cuando + '</b> · sin medidas en ese momento.'); return; }
+    let txt = '<b>' + cuando + '</b>';
+    if (tv) {
+      const a = tv.indexOf(Math.max(...tv)), b = tv.indexOf(Math.min(...tv));
+      txt += '<br><span class="c-verde">▲ Más alta: C' + (a + 1) + ' · ' + decimal(tv[a], 3) + ' V</span> &nbsp; <span class="c-rojo">▼ Más baja: C' + (b + 1) + ' · ' + decimal(tv[b], 3) + ' V</span> &nbsp; Diferencia ' + Math.round((tv[a] - tv[b]) * 1000) + ' mV';
+    }
+    if (fila) {
+      const malas = fila.map((v, i) => [v, i]).filter(p => p[0] >= 5).sort((a, b) => b[0] - a[0]);
+      txt += '<br>' + (malas.length ? 'Bajan: ' + malas.map(p => 'C' + (p[1] + 1) + ' ' + Math.round(p[0]) + ' mV').join(', ') : 'Ninguna celda baja más de 5 mV');
+    }
+    poner('ca-detalle', txt);
   }
   async function pintarGraficaCelda(x) {
     if (!graficaCelda) graficaCelda = crearGrafica($('fi-grafica'));
