@@ -473,7 +473,7 @@
   const flotaReal = () => FLOTA.concat(flotaSinLora()).filter(reciente).concat(flotaRed());
   const AVISO_V = 3.0, CRITICO_V = 2.8, AVISO_V_ALTA = 3.6, CRITICO_V_ALTA = 3.65, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
   const AUX_CRITICO = 11.8, AUX_AVISO = 12.2, AUX_ALTA = 14.8, AUX_MUY_ALTA = 15.5;   // batería auxiliar de 12 V, como en la pantalla del coche
-  const NOMBRES_TIPO = { volcada: 'Batería volcada', golpe: 'Golpe',  tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
+  const NOMBRES_TIPO = { volcada: 'Batería volcada', golpe: 'Golpe fuerte', movimiento: 'Batería en movimiento',  tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
 
   function alarmasCeldas(v) {
     const lista = [];
@@ -486,13 +486,21 @@
     else if (vMax >= AVISO_V_ALTA) lista.push({ tipo: 'tension_alta', nivel: 1, texto: 'Celda ' + cMax + ' a ' + decimal(vMax, 2) + ' V: por encima de ' + decimal(AVISO_V_ALTA, 2) + ' V' });
     return lista;
   }
-  const GOLPE_RECIENTE_MS = 600000;
+  const GOLPE_FUERTE_G = 2, GOLPE_RECIENTE_MS = 300000;
+  const golpeReciente = a => a && a.pico_g >= GOLPE_FUERTE_G && Date.now() - (a.golpe_hora || a.hora) < GOLPE_RECIENTE_MS;
   function alarmasAcel(a) {
     if (!a) return [];
     const r = [];
     if (a.volcada) r.push({ tipo: 'volcada', nivel: 2, texto: 'Batería volcada (' + a.inclinacion + 'º)' });
-    if (a.pico_g && Date.now() - a.hora < GOLPE_RECIENTE_MS) r.push({ tipo: 'golpe', nivel: 1, desde: a.hora, texto: 'Golpe de ' + decimal(a.pico_g, 1) + ' g ' + hace(Date.now() - a.hora) });
+    if (golpeReciente(a)) r.push({ tipo: 'golpe', nivel: 2, desde: a.golpe_hora || a.hora, texto: 'Golpe de ' + decimal(a.pico_g, 1) + ' g' });
+    if (a.moviendo) r.push({ tipo: 'movimiento', nivel: 1, texto: 'Se está moviendo (giroscopio)' });
     return r;
+  }
+  // Verde: XYZ estable · naranja: se mueve · rojo: golpe fuerte o volcada
+  function textoAcel(a) {
+    if (!a) return suave('Sin giroscopio');
+    const estado = a.volcada ? '<b class="c-rojo">Volcada</b>' : golpeReciente(a) ? '<b class="c-rojo">Golpe fuerte de ' + decimal(a.pico_g, 1) + ' g</b>' : a.moviendo ? '<b class="c-naranja">En movimiento</b>' : '<b class="c-verde">XYZ estable</b>';
+    return estado + suave(' · inclinación ' + Math.round(a.inclinacion) + 'º · ' + a.golpes + (a.golpes === 1 ? ' golpe' : ' golpes'));
   }
   function alarmasTemperatura(t) {
     if (t === null) return [];
@@ -550,7 +558,9 @@
   function dispositivoDemo(b) {
     const v = b.v, vMin = Math.min(...v), vMax = Math.max(...v), tMax = Math.max(...b.t);
     const x = { id: b.id, nombre: 'Batería ' + b.id, real: false, b, zona: b.pol.nombre, zonaId: b.pol.id, modelo: b.pol.modelo, conectado: !b.corteDesde, ultimaMs: b.corteDesde || Date.now(), lat: b.lat, lon: b.lon, celdas: b.corteDesde ? b.vCorte : v, tension: v.reduce((a, c) => a + c, 0), soc: b.soc, temp: tMax, rssi: b.rssi, snr: b.snr, corriente: b.corriente, soh: b.soh, tensionNota: '' };
-    x.alarmas = alarmasComunicacion(x).concat(alarmasCeldas(v), alarmasTemperatura(tMax));
+    x.acel = b.acel;
+    if (b.carretilla) x.modelo = b.pol.modelo;
+    x.alarmas = alarmasComunicacion(x).concat(alarmasCeldas(v), alarmasTemperatura(tMax), b.corteDesde ? [] : alarmasAcel(b.acel));
     return x;
   }
 
@@ -847,7 +857,12 @@
   const POLIGONOS = [
     { id: 'C', nombre: 'Polígono Paterna', modelo: 'wBMS-R24', celdas: 24, sondas: 6, n: 15, cols: 5, nave: [[39.512636, -0.44997], [39.512616, -0.449147], [39.512071, -0.449097], [39.512093, -0.449978]] },
     { id: 'D', nombre: 'Polígono Riba-roja', modelo: 'wBMS-R32', celdas: 32, sondas: 10, n: 23, cols: 5, nave: [[39.486748, -0.531974], [39.486648, -0.530727], [39.485676, -0.530859], [39.485788, -0.532117]] },
+    // Dos carretillas que se mueven por la campa y de vez en cuando se dan algún golpe
+    { id: 'F', nombre: 'Plataforma logística Zaragoza', modelo: 'Carretilla elevadora · 80 V', celdas: 24, sondas: 4, n: 2, cols: 2, carretilla: true, nave: [[41.6262, -0.9905], [41.6262, -0.9865], [41.6238, -0.9865], [41.6238, -0.9905]] },
   ];
+  // Recorrido de las carretillas dentro de la zona (u de oeste a este, v de norte a sur)
+  const RUTA_CARRETILLA = [[0.1, 0.15], [0.9, 0.15], [0.9, 0.5], [0.3, 0.5], [0.3, 0.85], [0.9, 0.85], [0.6, 0.6], [0.1, 0.85]];
+  const enZona = (p, u, v) => { const [no, ne, se, so] = p.nave, k = i => (1 - v) * ((1 - u) * no[i] + u * ne[i]) + v * ((1 - u) * so[i] + u * se[i]); return [k(0), k(1)]; };
   let demo = [], modoDemo = memoria.leer('modo-demo') === '1';
   const demoPorId = id => demo.find(b => b.id === id);
   const azar = (a, b) => a + Math.random() * (b - a);
@@ -858,7 +873,7 @@
     POLIGONOS.forEach(p => {
       const filas = Math.ceil(p.n / p.cols), [no, ne, se, so] = p.nave;
       for (let i = 0; i < p.n; i++) {
-        const u = 0.12 + 0.76 * (i % p.cols) / (p.cols - 1), v = 0.15 + 0.7 * Math.floor(i / p.cols) / (filas - 1);
+        const u = 0.12 + 0.76 * (i % p.cols) / (p.cols - 1), v = filas > 1 ? 0.15 + 0.7 * Math.floor(i / p.cols) / (filas - 1) : 0.5;
         const enNave = k => (1 - v) * ((1 - u) * no[k] + u * ne[k]) + v * ((1 - u) * so[k] + u * se[k]);
         demo.push({
           id: p.id + '-' + String(i + 1).padStart(2, '0'), pol: p,
@@ -867,12 +882,16 @@
           margen: Array.from({ length: p.celdas }, () => azar(-0.008, 0.008)),
           sondasBase: Array.from({ length: p.sondas }, () => azar(-1.5, 1.5)),
           calor: 0, fallo: null, corteDesde: 0, v: [], t: [],
+          acel: { moviendo: false, volcada: false, golpes: 0, pico_g: 0, inclinacion: azar(0, 2), hora: Date.now(), golpe_hora: 0 },
         });
+        if (p.carretilla) Object.assign(demo[demo.length - 1], { carretilla: true, tramo: i * 4, u: RUTA_CARRETILLA[i * 4][0], vv: RUTA_CARRETILLA[i * 4][1], paradaHasta: 0 });
       }
     });
     demoPorId('C-04').fallo = { celda: 6, actual: 2.92, objetivo: 2.92 };
     demoPorId('D-17').fallo = { celda: 11, actual: 2.74, objetivo: 2.74 };
     demoPorId('D-09').calor = 27;
+    // Una carretilla empieza con un golpe de hace un rato para que se vea el aviso rojo
+    Object.assign(demoPorId('F-01').acel, { golpes: 1, pico_g: 3.1, golpe_hora: Date.now() - 40000 });
     demo.forEach(actualizarBateria);
   }
 
@@ -891,6 +910,25 @@
       b.v[f.celda] = f.actual;
     }
     b.t = b.sondasBase.map(m => 24 + Math.abs(b.corriente) * 0.1 + m + b.calor + azar(-0.15, 0.15));
+    if (b.carretilla) moverCarretilla(b);
+    else b.acel.inclinacion = Math.max(0, Math.min(2, b.acel.inclinacion + azar(-0.05, 0.05)));
+  }
+  // Avanza por su recorrido a unos 2-3 m/s, para de vez en cuando a cargar o descargar y a veces se da un golpe
+  function moverCarretilla(b) {
+    const a = b.acel, ahora = Date.now(), parada = ahora < b.paradaHasta;
+    if (!parada) {
+      const [u, v] = RUTA_CARRETILLA[b.tramo % RUTA_CARRETILLA.length], du = u - b.u, dv = v - b.vv, d = Math.hypot(du, dv), paso = 0.008;
+      if (d <= paso) {
+        b.u = u; b.vv = v; b.tramo++;
+        if (Math.random() < 0.35) b.paradaHasta = ahora + azar(15000, 45000);
+      } else { b.u += du / d * paso; b.vv += dv / d * paso; }
+      [b.lat, b.lon] = enZona(b.pol, b.u, b.vv);
+      b.corriente = -azar(40, 60);
+      if (Math.random() < 1 / 150) { a.golpes++; a.pico_g = azar(2.2, 4.2); a.golpe_hora = ahora; a.hora = ahora; }
+    } else b.corriente = Math.max(-8, b.corriente * 0.5);
+    if (a.moviendo !== !parada) a.hora = ahora;
+    a.moviendo = !parada;
+    a.inclinacion = parada ? azar(0.5, 1.5) : azar(1, 6);
   }
   function simularFallo() {
     const sanas = demo.filter(b => !b.fallo && !b.corteDesde && !alarmasCeldas(b.v).length);
@@ -1155,13 +1193,13 @@
         fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
         fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')) +
-        (x.d && x.d.acel ? fila('Movimiento', (x.d.acel.volcada ? '<b class="c-rojo">Volcada</b>' : x.d.acel.moviendo ? '<b class="c-naranja">Se está moviendo</b>' : 'Quieta') + suave(' · inclinación ' + x.d.acel.inclinacion + 'º · ' + x.d.acel.golpes + ' golpes · último cambio ' + hace(Date.now() - x.d.acel.hora))) : ''));
+        (x.d && x.d.acel ? fila('Giroscopio', textoAcel(x.d.acel)) : ''));
     } else if (x.real && x.c.sinLora) {
       poner('fi-ajustes', fila('Enlace', x.conectado && x.d.enlace ? escapar(x.d.enlace) : suave('Sin enlace')) + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
     } else if (x.real) {
       poner('fi-ajustes', fila('Wi-Fi', textoWifi(x.d)) + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', textoGps(x.d)) + fila('Posición', x.lat !== null ? coordenadas(x) : suave('Sin posición')) + fila('Alimentación', textoCorriente(x.d)));
     } else {
-      poner('fi-ajustes', fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(x)) + fila('Alimentación', 'Simulada'));
+      poner('fi-ajustes', fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(x)) + fila('Alimentación', 'Simulada') + fila('Giroscopio', textoAcel(x.acel)));
     }
     const hayBms = !!x.celdas || x.soc !== null && x.soc !== undefined;
     poner('fi-bms-estado', x.real && !hayBms ? '<span class="pastilla no">NO CONECTADO</span>' : '');
