@@ -112,6 +112,9 @@
   .alarma b { flex:none; }
   .alarma small { display:block; color:var(--suave); font-size:12.5px; }
   .tabla-marco { overflow-x:auto; }
+  .gy-sub { margin:16px 0 6px; font-size:13px; font-weight:650; color:var(--suave); text-transform:uppercase; letter-spacing:.06em; }
+  .gy-lista { max-height:260px; overflow:auto; }
+  .gy-lista table { font-size:12.5px; } .gy-lista td, .gy-lista th { padding:7px 6px; }
   table { width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums; }
   th { padding:6px 9px; border-bottom:1px solid var(--linea); color:var(--suave); font-size:11.5px; font-weight:700; letter-spacing:.05em; text-align:left; text-transform:uppercase; white-space:nowrap; }
   td { padding:8px 9px; border-bottom:1px solid var(--linea); white-space:nowrap; }
@@ -320,6 +323,14 @@
         <section class="panel"><div class="titulo"><h2>Ajustes</h2></div><div class="filas" id="fi-ajustes"></div></section>
         <section class="panel"><div class="titulo"><h2>Datos del BMS</h2><span id="fi-bms-estado"></span></div><div class="filas" id="fi-bms"></div></section>
       </div>
+      <section class="panel" aria-labelledby="t-gyro">
+        <div class="titulo"><h2 id="t-gyro">GYRO</h2></div>
+        <div class="filas" id="gy-estado"></div>
+        <h3 class="gy-sub">Historial de golpes</h3>
+        <div class="gy-lista tabla-marco" id="gy-golpes"></div>
+        <h3 class="gy-sub">Historial de posiciones</h3>
+        <div class="gy-lista tabla-marco" id="gy-pos"></div>
+      </section>
       <section class="panel" aria-labelledby="t-celdas">
         <div class="titulo"><h2 id="t-celdas">Tensión por celda</h2><div class="segmento" role="group" aria-label="Periodo de la gráfica" id="fi-rangos"></div></div>
         <div id="fi-sin-celdas" class="vacio" hidden>Sin datos: el BMS no está conectado.</div>
@@ -499,8 +510,39 @@
   // Verde: XYZ estable · naranja: se mueve · rojo: golpe fuerte o volcada
   function textoAcel(a) {
     if (!a) return suave('Sin giroscopio');
-    const estado = a.volcada ? '<b class="c-rojo">Volcada</b>' : golpeReciente(a) ? '<b class="c-rojo">Golpe fuerte de ' + decimal(a.pico_g, 1) + ' g</b>' : a.moviendo ? '<b class="c-naranja">En movimiento</b>' : '<b class="c-verde">XYZ estable</b>';
-    return estado + suave(' · inclinación ' + Math.round(a.inclinacion) + 'º · ' + a.golpes + (a.golpes === 1 ? ' golpe' : ' golpes'));
+    const e = (c, txt) => '<span class="' + c + '" style="font-weight:700">' + txt + '</span>';
+    return a.volcada ? e('c-rojo', 'Volcada') : golpeReciente(a) ? e('c-rojo', 'Golpe fuerte de ' + decimal(a.pico_g, 1) + ' g') : a.moviendo ? e('c-naranja', 'En movimiento') : e('c-verde', 'XYZ estable');
+  }
+  // Historial de golpes y posiciones de cada batería real: se guarda en este móvil
+  const HIST_GYRO = {};
+  function histGyro(id) {
+    if (!HIST_GYRO[id]) {
+      let h = null;
+      try { h = JSON.parse(memoria.leer('gyro-' + id) || 'null'); } catch (e) { h = null; }
+      HIST_GYRO[id] = h && Array.isArray(h.pos) && Array.isArray(h.golpes) ? h : { golpes: [], pos: [] };
+    }
+    return HIST_GYRO[id];
+  }
+  const metros = (a, lat, lon) => Math.hypot((a.lat - lat) * 111320, (a.lon - lon) * 111320 * Math.cos(lat * Math.PI / 180));
+  // Una posición nueva si pasa de parada a en marcha (o al revés), si se ha movido más de 10 m (como mucho una por minuto) o cada 30 min
+  function apuntarPosicion(h, t, lat, lon, mov) {
+    const u = h.pos[0];
+    if (u && u.mov === mov && (t - u.t < 6e4 || metros(u, lat, lon) < 10 && t - u.t < 18e5)) return false;
+    h.pos.unshift({ t, lat, lon, mov });
+    if (h.pos.length > 100) h.pos.length = 100;
+    return true;
+  }
+  function apuntarGolpe(h, t, g, lat, lon) {
+    h.golpes.unshift({ t, g, lat, lon });
+    if (h.golpes.length > 50) h.golpes.length = 50;
+  }
+  const enlaceMapa = p => p.lat === undefined || p.lat === null ? suave('Sin posición') : '<a target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + p.lat.toFixed(5) + ',' + p.lon.toFixed(5) + '">' + decimal(p.lat, 4) + ', ' + decimal(p.lon, 4) + '</a>';
+  const fechaCorta = t => new Date(t).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  function pintarGyro(x) {
+    const a = x.real ? x.d && x.d.acel : x.acel, h = x.real ? histGyro(x.id) : x.b.hist;
+    poner('gy-estado', fila('Estado', textoAcel(a)) + (a ? fila('Inclinación', Math.round(a.inclinacion) + 'º') + fila('Golpes registrados', String(a.golpes)) : ''));
+    poner('gy-golpes', h.golpes.length ? '<table><thead><tr><th>Cuándo</th><th>Fuerza</th><th>Dónde</th></tr></thead><tbody>' + h.golpes.map(g => '<tr><td>' + fechaCorta(g.t) + '</td><td><b class="' + (g.g >= GOLPE_FUERTE_G ? 'c-rojo' : 'c-naranja') + '">' + decimal(g.g, 1) + ' g</b></td><td>' + enlaceMapa(g) + '</td></tr>').join('') + '</tbody></table>' : '<p class="pista">Sin golpes registrados.</p>');
+    poner('gy-pos', h.pos.length ? '<table><thead><tr><th>Cuándo</th><th>Estado</th><th>Posición</th></tr></thead><tbody>' + h.pos.slice(0, 50).map(p => '<tr><td>' + fechaCorta(p.t) + '</td><td>' + (p.mov ? '<span class="c-naranja">En movimiento</span>' : '<span class="c-verde">Parada</span>') + '</td><td>' + enlaceMapa(p) + '</td></tr>').join('') + '</tbody></table>' : '<p class="pista">' + (x.real ? 'Todavía no ha enviado ninguna posición GPS.' : 'Sin posiciones.') + '</p>');
   }
   function alarmasTemperatura(t) {
     if (t === null) return [];
@@ -727,6 +769,11 @@
       if (p.tension === null && aux && aux.hora && conectado(aux)) p.tension = aux.voltios;
       p.soc = opcional(d.soc); p.temp = opcional(d.temp); p.i = opcional(d.corriente);
       guardarPaquete(p);
+      const h = histGyro(c.id), a = d.acel;
+      let cambio = d.lat !== undefined && d.fix ? apuntarPosicion(h, p.t, d.lat, d.lon, !!(a && a.moviendo)) : false;
+      if (a && h.ultGolpes !== undefined && a.golpes !== h.ultGolpes && a.pico_g) { apuntarGolpe(h, a.golpe_hora || a.hora, a.pico_g, d.lat, d.lon); cambio = true; }
+      if (a && a.golpes !== h.ultGolpes) { h.ultGolpes = a.golpes; cambio = true; }
+      if (cambio) memoria.guardar('gyro-' + c.id, JSON.stringify(h));
     });
   }
 
@@ -890,8 +937,23 @@
     demoPorId('C-04').fallo = { celda: 6, actual: 2.92, objetivo: 2.92 };
     demoPorId('D-17').fallo = { celda: 11, actual: 2.74, objetivo: 2.74 };
     demoPorId('D-09').calor = 27;
+    // Historial: las fijas, una posición cada 30 min en su sitio; las carretillas, su recorrido y golpes pasados
+    const ahora = Date.now();
+    demo.forEach(b => {
+      b.hist = { golpes: [], pos: [] };
+      if (!b.carretilla) { for (let k = 0; k < 12; k++) b.hist.pos.push({ t: ahora - k * 18e5, lat: b.lat, lon: b.lon, mov: false }); return; }
+      for (let k = 1; k <= 60; k++) {
+        const r = RUTA_CARRETILLA[(b.tramo + 64 - k) % RUTA_CARRETILLA.length], [lat, lon] = enZona(b.pol, r[0] + azar(-0.03, 0.03), r[1] + azar(-0.03, 0.03));
+        b.hist.pos.push({ t: ahora - k * 12e4, lat, lon, mov: k % 4 !== 0 });
+      }
+      [[3, 2.6], [9, 1.6], [20, 3.4]].forEach(([horas, g]) => { const p = b.hist.pos[Math.min(59, horas * 2)]; apuntarGolpe(b.hist, ahora - horas * 36e5 - azar(0, 18e5), g + azar(-0.2, 0.2), p.lat, p.lon); });
+      b.hist.golpes.sort((m, n) => n.t - m.t);
+      b.acel.golpes = b.hist.golpes.length;
+    });
     // Una carretilla empieza con un golpe de hace un rato para que se vea el aviso rojo
-    Object.assign(demoPorId('F-01').acel, { golpes: 1, pico_g: 3.1, golpe_hora: Date.now() - 40000 });
+    const f1 = demoPorId('F-01');
+    Object.assign(f1.acel, { golpes: f1.acel.golpes + 1, pico_g: 3.1, golpe_hora: ahora - 40000 });
+    apuntarGolpe(f1.hist, ahora - 40000, 3.1, f1.lat, f1.lon);
     demo.forEach(actualizarBateria);
   }
 
@@ -924,8 +986,9 @@
       } else { b.u += du / d * paso; b.vv += dv / d * paso; }
       [b.lat, b.lon] = enZona(b.pol, b.u, b.vv);
       b.corriente = -azar(40, 60);
-      if (Math.random() < 1 / 150) { a.golpes++; a.pico_g = azar(2.2, 4.2); a.golpe_hora = ahora; a.hora = ahora; }
+      if (Math.random() < 1 / 150) { a.golpes++; a.pico_g = azar(2.2, 4.2); a.golpe_hora = ahora; a.hora = ahora; apuntarGolpe(b.hist, ahora, a.pico_g, b.lat, b.lon); }
     } else b.corriente = Math.max(-8, b.corriente * 0.5);
+    if (b.hist) apuntarPosicion(b.hist, ahora, b.lat, b.lon, !parada);
     if (a.moviendo !== !parada) a.hora = ahora;
     a.moviendo = !parada;
     a.inclinacion = parada ? azar(0.5, 1.5) : azar(1, 6);
@@ -1193,13 +1256,13 @@
         fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
         fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')) +
-        (x.d && x.d.acel ? fila('Giroscopio', textoAcel(x.d.acel)) : ''));
+        '');
     } else if (x.real && x.c.sinLora) {
       poner('fi-ajustes', fila('Enlace', x.conectado && x.d.enlace ? escapar(x.d.enlace) : suave('Sin enlace')) + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
     } else if (x.real) {
       poner('fi-ajustes', fila('Wi-Fi', textoWifi(x.d)) + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', textoGps(x.d)) + fila('Posición', x.lat !== null ? coordenadas(x) : suave('Sin posición')) + fila('Alimentación', textoCorriente(x.d)));
     } else {
-      poner('fi-ajustes', fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(x)) + fila('Alimentación', 'Simulada') + fila('Giroscopio', textoAcel(x.acel)));
+      poner('fi-ajustes', fila('Wi-Fi', 'Simulado') + fila('Enlace LoRa', textoLora(x)) + fila('Posicionamiento', 'Simulado') + fila('Posición', coordenadas(x)) + fila('Alimentación', 'Simulada'));
     }
     const hayBms = !!x.celdas || x.soc !== null && x.soc !== undefined;
     poner('fi-bms-estado', x.real && !hayBms ? '<span class="pastilla no">NO CONECTADO</span>' : '');
@@ -1226,6 +1289,7 @@
       (x.d.balanceo ? fila('Balanceando', x.d.balanceo.length ? 'Celdas ' + x.d.balanceo.join(', ') : 'Ninguna') : '');
     if (x.d && x.d.bms && Object.keys(x.d.bms).length) filasBms += filasBmsCan(x.d.bms);
     poner('fi-bms', filasBms);
+    pintarGyro(x);
 
     // Celdas
     $('fi-sin-celdas').hidden = !!x.celdas;
@@ -1572,7 +1636,7 @@
       return '<tr><td>Placa de ' + escapar(e.x.id) + '</td><td>' + (e.activa ? '<span class="pastilla lora">ACTIVA</span>' : '<span class="pastilla gris">INACTIVA</span>') + '</td><td>' + escapar((FLOTA.find(c => c.nodo === e.x.c.otro) || {}).id || '—') + '</td><td class="c-lora">' + (oido ? d.rssi_lora + ' dB' : '—') + '</td><td>' + (d && d.wifi_red ? escapar(d.wifi_red) + (e.activa ? rayas(rayasWifi(d.rssi_wifi)) : '') : '—') + '</td><td>' + (d && d.wifi_hora ? hace(Date.now() - d.wifi_hora) : '—') + '</td></tr>';
     }).join('') + '</tbody></table>');
     const pq = recientes.slice(0, 40);
-    poner('com-paquetes', pq.length ? '<table><thead><tr><th scope="col">Fecha</th><th scope="col">Dispositivo</th><th scope="col">Ruta</th><th scope="col">RSSI</th><th scope="col">SNR</th><th scope="col">GPS</th></tr></thead><tbody>' + pq.map(p => '<tr><td>' + fechaHora(p.t) + '</td><td>' + escapar(p.dev) + '</td><td>' + escapar(p.ruta || '—') + '</td><td class="c-lora">' + (p.rssi ? p.rssi + ' dB' : '—') + '</td><td>' + (p.snr !== null && p.snr !== undefined ? decimal(p.snr, 1) + ' dB' : '—') + '</td><td>' + (p.fix ? p.sats + ' sat.' : 'Sin fijar') + '</td></tr>').join('') + '</tbody></table>' : '<div class="vacio">Aún no ha llegado ningún paquete desde que la aplicación está abierta en este dispositivo.</div>');
+    poner('com-paquetes', pq.length ? '<table><thead><tr><th scope="col">Fecha</th><th scope="col">Dispositivo</th><th scope="col">Ruta</th><th scope="col">RSSI</th><th scope="col">SNR</th><th scope="col">GPS</th></tr></thead><tbody>' + pq.map(p => '<tr><td>' + fechaCorta(p.t) + '</td><td>' + escapar(p.dev) + '</td><td>' + escapar(p.ruta || '—') + '</td><td class="c-lora">' + (p.rssi ? p.rssi + ' dB' : '—') + '</td><td>' + (p.snr !== null && p.snr !== undefined ? decimal(p.snr, 1) + ' dB' : '—') + '</td><td>' + (p.fix ? p.sats + ' sat.' : 'Sin fijar') + '</td></tr>').join('') + '</tbody></table>' : '<div class="vacio">Aún no ha llegado ningún paquete desde que la aplicación está abierta en este dispositivo.</div>');
   }
 
   // Gráficas
