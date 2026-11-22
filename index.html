@@ -1155,7 +1155,7 @@
         fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
         fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')) +
-        fila('Movimiento', x.d && x.d.acel ? (x.d.acel.volcada ? '<b class="c-rojo">Volcada</b>' : x.d.acel.moviendo ? '<b class="c-naranja">Se está moviendo</b>' : 'Quieta') + suave(' · inclinación ' + x.d.acel.inclinacion + 'º · ' + x.d.acel.golpes + ' golpes · último cambio ' + hace(Date.now() - x.d.acel.hora)) : suave('Sin acelerómetro')));
+        (x.d && x.d.acel ? fila('Movimiento', (x.d.acel.volcada ? '<b class="c-rojo">Volcada</b>' : x.d.acel.moviendo ? '<b class="c-naranja">Se está moviendo</b>' : 'Quieta') + suave(' · inclinación ' + x.d.acel.inclinacion + 'º · ' + x.d.acel.golpes + ' golpes · último cambio ' + hace(Date.now() - x.d.acel.hora))) : ''));
     } else if (x.real && x.c.sinLora) {
       poner('fi-ajustes', fila('Enlace', x.conectado && x.d.enlace ? escapar(x.d.enlace) : suave('Sin enlace')) + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
     } else if (x.real) {
