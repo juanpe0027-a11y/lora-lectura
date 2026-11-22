@@ -926,7 +926,8 @@
           id: p.id + '-' + String(i + 1).padStart(2, '0'), pol: p,
           lat: enNave(0), lon: enNave(1),
           soc: azar(35, 96), soh: azar(88, 99), corriente: azar(-35, 35), rssi: Math.round(azar(-112, -74)), snr: azar(1, 10),
-          margen: Array.from({ length: p.celdas }, () => azar(-0.008, 0.008)),
+          // La más baja se separa un poco más para que siempre sea la mínima (y la peor en la gráfica de caída)
+          margen: (m => { const i = m.indexOf(Math.min(...m)); m[i] -= 0.005; return m; })(Array.from({ length: p.celdas }, () => azar(-0.008, 0.008))),
           sondasBase: Array.from({ length: p.sondas }, () => azar(-1.5, 1.5)),
           calor: 0, fallo: null, corteDesde: 0, v: [], t: [],
           acel: { moviendo: false, volcada: false, golpes: 0, pico_g: 0, inclinacion: azar(0, 2), hora: Date.now(), golpe_hora: 0 },
@@ -1310,7 +1311,11 @@
   const TRAMOS_CAIDA = [[5, 'var(--panel3)', '< 5'], [10, '#5b4250', '5-10'], [20, '#8f4b33', '10-20'], [35, '#c8662b', '20-35'], [60, '#f5913a', '35-60'], [Infinity, '#ff5b4d', '> 60']];
   let caidaSel = null, tokenCaida = 0, caidaClave = '', caidaHora = 0, caidaUltima = null;
   function caidaDemo(x, cols) {
-    const s = semilla(x.id), n = x.celdas.length, mala = s % n, regular = (s * 7 + 3) % n, floja = (s * 13 + 5) % n;
+    // Las que más caen son las que ahora mismo están más bajas, para que cuadre con la celda mínima
+    // (por su margen fijo, sin el ruido de cada segundo; la celda con fallo va la primera)
+    const s = semilla(x.id), n = x.celdas.length, b = x.b, peso = i => b.fallo && b.fallo.celda === i ? -9 : b.margen[i];
+    const orden = x.celdas.map((v, i) => i).sort((i, k) => peso(i) - peso(k));
+    const mala = orden[0], regular = orden[1], floja = orden[2];
     return Array.from({ length: cols }, (_, j) => x.celdas.map((v, i) => {
       const base = i === mala ? 70 : i === regular ? 14 : i === floja ? 7 : 1.5;
       return Math.max(0, base * (1 + ruido(s + i, j, 3) * 0.5) + (ruido(s, i, j) > 0.42 ? 6 : 0));
@@ -1318,12 +1323,13 @@
   }
   function voltDemo(x, matriz) {
     const s = semilla(x.id), o = x.celdas.slice().sort((a, b) => a - b), m = o[Math.floor(o.length / 2)];
-    return matriz.map((fila, j) => fila.map((d, i) => m + ruido(s + i, j, 9) * 0.006 - d / 1000));
+    // La última columna es el momento actual: las mismas tensiones que las casillas de arriba
+    return matriz.map((fila, j) => j === matriz.length - 1 ? x.celdas.slice() : fila.map((d, i) => m + ruido(s + i, j, 9) * 0.006 - d / 1000));
   }
   async function pintarCaida(x) {
     const R = RANGOS[rangoCelda], n = x.celdas.length, cols = R.n;
     const clave = x.id + '|' + rangoCelda + '|' + n + '|' + caidaSel + '|' + celdaGraf;
-    if (clave === caidaClave && Date.now() - caidaHora < 5000) return;
+    if (x.real && clave === caidaClave && Date.now() - caidaHora < 5000) return;  // la DEMO se repinta siempre para seguir a las celdas
     caidaClave = clave; caidaHora = Date.now();
     const hasta = Date.now(), desde = hasta - R.ms, token = ++tokenCaida;
     let matriz, conCarga = true;
