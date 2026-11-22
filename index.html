@@ -473,7 +473,7 @@
   const flotaReal = () => FLOTA.concat(flotaSinLora()).filter(reciente).concat(flotaRed());
   const AVISO_V = 3.0, CRITICO_V = 2.8, AVISO_V_ALTA = 3.6, CRITICO_V_ALTA = 3.65, DESEQ_V = 0.10, AVISO_T = 50, CRITICO_T = 60;   // valores de ejemplo para celdas LFP
   const AUX_CRITICO = 11.8, AUX_AVISO = 12.2, AUX_ALTA = 14.8, AUX_MUY_ALTA = 15.5;   // batería auxiliar de 12 V, como en la pantalla del coche
-  const NOMBRES_TIPO = { tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
+  const NOMBRES_TIPO = { volcada: 'Batería volcada', golpe: 'Golpe',  tension_baja: 'Tensión baja', tension_alta: 'Tensión excesiva', desequilibrio: 'Celda desequilibrada', temperatura: 'Temperatura elevada', desconectado: 'Dispositivo desconectado', comunicacion: 'Pérdida de comunicación', anomalo: 'Datos anómalos' };
 
   function alarmasCeldas(v) {
     const lista = [];
@@ -485,6 +485,14 @@
     if (vMax >= CRITICO_V_ALTA) lista.push({ tipo: 'tension_alta', nivel: 2, texto: 'Celda ' + cMax + ' a ' + decimal(vMax, 2) + ' V: por encima de ' + decimal(CRITICO_V_ALTA, 2) + ' V' });
     else if (vMax >= AVISO_V_ALTA) lista.push({ tipo: 'tension_alta', nivel: 1, texto: 'Celda ' + cMax + ' a ' + decimal(vMax, 2) + ' V: por encima de ' + decimal(AVISO_V_ALTA, 2) + ' V' });
     return lista;
+  }
+  const GOLPE_RECIENTE_MS = 600000;
+  function alarmasAcel(a) {
+    if (!a) return [];
+    const r = [];
+    if (a.volcada) r.push({ tipo: 'volcada', nivel: 2, texto: 'Batería volcada (' + a.inclinacion + 'º)' });
+    if (a.pico_g && Date.now() - a.hora < GOLPE_RECIENTE_MS) r.push({ tipo: 'golpe', nivel: 1, desde: a.hora, texto: 'Golpe de ' + decimal(a.pico_g, 1) + ' g ' + hace(Date.now() - a.hora) });
+    return r;
   }
   function alarmasTemperatura(t) {
     if (t === null) return [];
@@ -525,7 +533,7 @@
     if (d) {
       x.alarmas = alarmasComunicacion(x).concat(alarmasAnomalas(d));
       if (x.conectado) {
-        x.alarmas = x.alarmas.concat(alarmasCeldas(x.celdas), alarmasTemperatura(x.temp));
+        x.alarmas = x.alarmas.concat(alarmasCeldas(x.celdas), alarmasTemperatura(x.temp), alarmasAcel(d.acel));
         if (otro && conectado(otro) && !d.rssi_lora) x.alarmas.push({ tipo: 'comunicacion', nivel: 1, texto: 'Enlace LoRa sin señal' });
       }
       if (tieneAux && conectado(aux) && !x.celdas) {
@@ -725,6 +733,8 @@
     if (Array.isArray(d.sondas) && d.sondas.length <= 16 && d.sondas.every(v => Number.isFinite(Number(v)))) r.sondas = d.sondas.map(Number);
     if (Number.isInteger(d.balanceo) && d.balanceo >= 0 && d.balanceo < 256) r.balanceo = [0, 1, 2, 3, 4, 5, 6, 7].filter(i => d.balanceo >> i & 1).map(i => i + 1);
     r.celdas_hora = numero(d.celdas_hora);
+    // Acelerómetro: solo llega cuando cambia algo
+    if (d.acel && typeof d.acel === 'object' && numero(d.acel.hora)) r.acel = { moviendo: d.acel.moviendo === true, volcada: d.acel.volcada === true, golpes: numero(d.acel.golpes), pico_g: numero(d.acel.pico_g), inclinacion: numero(d.acel.inclinacion), hora: numero(d.acel.hora) };
     if (d.bms && typeof d.bms === 'object') {
       r.bms = {};
       Object.keys(d.bms).slice(0, 60).forEach(k => {
@@ -1144,7 +1154,8 @@
       poner('fi-ajustes', fila('Papel', papel) + fila('Wi-Fi de la pasarela', textoWifi(x.d)) +
         fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
-        fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')));
+        fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')) +
+        fila('Movimiento', x.d && x.d.acel ? (x.d.acel.volcada ? '<b class="c-rojo">Volcada</b>' : x.d.acel.moviendo ? '<b class="c-naranja">Se está moviendo</b>' : 'Quieta') + suave(' · inclinación ' + x.d.acel.inclinacion + 'º · ' + x.d.acel.golpes + ' golpes · último cambio ' + hace(Date.now() - x.d.acel.hora)) : suave('Sin acelerómetro')));
     } else if (x.real && x.c.sinLora) {
       poner('fi-ajustes', fila('Enlace', x.conectado && x.d.enlace ? escapar(x.d.enlace) : suave('Sin enlace')) + fila('Placa', escapar(x.id.slice(2))) + fila('Enlace LoRa', suave('No lleva LoRa')) + fila('Posición', suave('Sin posición')));
     } else if (x.real) {
