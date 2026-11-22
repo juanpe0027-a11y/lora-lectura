@@ -517,7 +517,7 @@
     x.celdas = bms.celdas || null;
     x.tension = opcional(bms.tension);
     x.tensionNota = c.sinLora && x.tension !== null ? 'Sensor del dispositivo' : '';
-    if (c.red) { x.modelo = 'Heltec V3 · ' + (bms.simulado ? 'BMS simulado' : 'BMS'); x.tensionNota = bms.simulado ? 'Dato simulado' : ''; }
+    if (c.red) { x.modelo = 'LI-Net'; x.tensionNota = bms.simulado ? 'Dato simulado' : ''; }
     if (x.tension === null && x.celdas) x.tension = x.celdas.reduce((a, v) => a + v, 0);
     if (x.tension === null && tieneAux) { x.tension = aux.voltios; x.tensionNota = conectado(aux) ? 'Sensor de batería auxiliar' : 'Sensor auxiliar · dato antiguo'; }
     x.soc = opcional(bms.soc); x.temp = opcional(bms.temp); x.rssi = bms.rssi_lora || null; x.snr = opcional(bms.snr); x.corriente = opcional(bms.corriente); x.soh = opcional(bms.soh);
@@ -1166,7 +1166,7 @@
     ].join(''));
     if (x.real && x.c.red) {
       const rpi = !!(x.d && x.d.pasarelaRpi), esPasarela = x.c.red === 1 && !rpi;
-      const papel = esPasarela ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo · hueco ' + (rpi ? x.c.red : x.c.red - 1) + ' del ciclo de 0,5 s' + (rpi ? ' · pasarela Raspberry + RAK2287' : '');
+      const papel = esPasarela ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo';
       poner('fi-ajustes', fila('Papel', papel) + fila('Wi-Fi de la pasarela', textoWifi(x.d)) +
         fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
