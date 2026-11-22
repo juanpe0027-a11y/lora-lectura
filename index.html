@@ -770,11 +770,6 @@
         if (n.temp !== undefined) n.sondas = [0, 1, 2].map(i => Math.round((n.temp - 0.4 * i + ruido(s, i, 4) * 0.3) * 10) / 10);
         n.ficticia = true;
       }
-      // Si no llegan por LoRa, las que la B2 sube por Wi-Fi (en morado)
-      if (!celdasLora && k === 2 && canB2 && !n.simulado) {
-        n.celdas = canB2.celdas;
-        n.wifiCan = canB2;
-      }
       if (e.red.pasarela && typeof e.red.pasarela === 'object') { n.wifi_red = typeof e.red.pasarela.wifi_red === 'string' ? e.red.pasarela.wifi_red.slice(0, 32) : ''; n.rssi_wifi = numero(e.red.pasarela.rssi_wifi); n.wifi_hora = numero(e.red.pasarela.hora); }
       r['red:b' + k] = n;
     });
@@ -782,27 +777,6 @@
     return r;
   }
 
-  // Atajo mientras no van por LoRa: las 8 celdas y las sondas una a una que la B2 sube por Wi-Fi (/can, mensajes
-  // extendidos del BMS Wattius: 0x0AA360nn = 4 celdas en mV, 0x0AB36000 = sondas en centésimas de ºC)
-  let canB2 = null;
-  async function leerCanB2() {
-    try {
-      const [ids, est] = await Promise.all(['ids', 'estado'].map(k => fetch(BASE + encodeURIComponent(CLAVE) + '/can/' + k + '.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)));
-      const trama = k => ids && ids[k] && typeof ids[k].d === 'string' && /^[0-9A-F]{16}$/.test(ids[k].d) && numero(ids[k].hace_s) < 10 ? ids[k].d : null;
-      const a = trama('0AA36000'), b = trama('0AA36001'), s = trama('0AB36000'), bal = trama('0AC36000'), hora = est ? numero(est.hora) : 0;
-      const palabra = (h, i) => parseInt(h.substr(i * 4, 4), 16);
-      const decimas = (k, i) => { const h = trama(k); return h ? palabra(h, i) / 10 : null; };
-      const antes = JSON.stringify(canB2);
-      canB2 = a && b && hora && Date.now() - hora < 15000 ? {
-        celdas: [0, 1, 2, 3].map(i => palabra(a, i) / 1000).concat([0, 1, 2, 3].map(i => palabra(b, i) / 1000)),
-        sondas: s ? [0, 1, 2].map(i => palabra(s, i) / 100) : null,
-        // Balanceo: un bit por celda (sin confirmar; ahora no balancea ninguna)
-        balanceo: bal ? [0, 1, 2, 3, 4, 5, 6, 7].filter(i => parseInt(bal.substr(0, 2), 16) >> i & 1).map(i => i + 1) : null,
-        vPack: decimas('350', 1), vCarga: decimas('360', 1), vDescarga: decimas('370', 1),
-      } : null;
-      if (JSON.stringify(canB2) !== antes && crudo) recibido();
-    } catch (err) { canB2 = null; }
-  }
 
   let leyendo = false, enVivo = false, crudo = null, sinInternet = false;
   function ponerRed(texto, cls) { $('red').textContent = texto; $('red').className = 'pastilla ' + cls; }
@@ -1759,8 +1733,6 @@
     if (!HAY_CLAVE) return;
     leer();
     escuchar();
-    leerCanB2();
-    setInterval(leerCanB2, CADA_MS);
     // Con el aviso en directo solo se repasa de vez en cuando; si se corta, se lee cada 2 s
     let vueltas = 0;
     setInterval(() => { if (!enVivo || ++vueltas % REPASO_VUELTAS === 0) leer(); }, CADA_MS);
