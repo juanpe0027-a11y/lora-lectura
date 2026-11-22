@@ -721,6 +721,10 @@
     ['snr', 'soc', 'soh', 'temp', 'tension', 'corriente'].forEach(k => { const v = opcional(d[k]); if (v !== null) r[k] = v; });
     if (Array.isArray(d.celdas) && d.celdas.length && d.celdas.length <= 64 && d.celdas.every(v => Number.isFinite(Number(v)))) r.celdas = d.celdas.map(Number);
     ['hdop', 'alt'].forEach(k => { const v = opcional(d[k]); if (v !== null) r[k] = v; });
+    // Sondas y balanceo del BMS que llegan por LoRa junto a las celdas
+    if (Array.isArray(d.sondas) && d.sondas.length <= 16 && d.sondas.every(v => Number.isFinite(Number(v)))) r.sondas = d.sondas.map(Number);
+    if (Number.isInteger(d.balanceo) && d.balanceo >= 0 && d.balanceo < 256) r.balanceo = [0, 1, 2, 3, 4, 5, 6, 7].filter(i => d.balanceo >> i & 1).map(i => i + 1);
+    r.celdas_hora = numero(d.celdas_hora);
     if (d.bms && typeof d.bms === 'object') {
       r.bms = {};
       Object.keys(d.bms).slice(0, 60).forEach(k => {
@@ -754,7 +758,20 @@
       n.atrasoRed = numero(e.red.pasarela && e.red.pasarela.hora) - n.hora;
       n.calidad = numero(d.calidad);
       n.pasarelaRpi = !!(e.red.pasarela && e.red.pasarela.tipo === 'raspberry');
-      if (k === 2 && canB2 && !n.simulado) {
+      // Celdas por LoRa: valen si llegaron hace poco respecto al último dato de la batería
+      const celdasLora = n.celdas && n.celdas_hora && Math.abs(n.hora - n.celdas_hora) < 15000 && !n.simulado;
+      if (!celdasLora) { delete n.celdas; delete n.sondas; delete n.balanceo; }
+      // BMS simulado: celdas y sondas ficticias a partir de su tensión y temperatura (la conexión sí es real)
+      if (n.simulado && n.tension) {
+        const nc = n.tension > 40 ? 16 : 8, s = semilla('b' + k), base = n.tension / nc;
+        const desv = Array.from({ length: nc }, (_, i) => ruido(s + i, 1, 2) * 0.012 + (i === s % nc ? -0.018 : 0));
+        const media = desv.reduce((a, v) => a + v, 0) / nc;
+        n.celdas = desv.map(v => Math.round((base + v - media) * 1000) / 1000);
+        if (n.temp !== undefined) n.sondas = [0, 1, 2].map(i => Math.round((n.temp - 0.4 * i + ruido(s, i, 4) * 0.3) * 10) / 10);
+        n.ficticia = true;
+      }
+      // Si no llegan por LoRa, las que la B2 sube por Wi-Fi (en morado)
+      if (!celdasLora && k === 2 && canB2 && !n.simulado) {
         n.celdas = canB2.celdas;
         n.wifiCan = canB2;
       }
@@ -1182,6 +1199,8 @@
         (w.vCarga !== null ? fila('Tensión máxima de carga (0x360)', m(decimal(w.vCarga, 1) + ' V')) : '') +
         (w.vDescarga !== null ? fila('Tensión mínima de descarga (0x370)', m(decimal(w.vDescarga, 1) + ' V')) : '');
     }
+    if (x.d && x.d.sondas && !w) filasBms += x.d.sondas.map((v, i) => fila('Sensor de temperatura ' + (i + 1), decimal(v, 1) + ' ºC' + (x.d.ficticia ? ' ' + suave('simulado') : ''))).join('') +
+      (x.d.balanceo ? fila('Balanceando', x.d.balanceo.length ? 'Celdas ' + x.d.balanceo.join(', ') : 'Ninguna') : '');
     if (x.d && x.d.bms && Object.keys(x.d.bms).length) filasBms += filasBmsCan(x.d.bms);
     poner('fi-bms', filasBms);
 
@@ -1197,7 +1216,7 @@
     const bajo = Math.min(r.vMin, CRITICO_V), rango = Math.max(0.01, Math.max(r.vMax, AVISO_V) - bajo);
     poner('fi-celdas', x.celdas.map((v, i) => '<button class="celda' + (x.d && x.d.wifiCan ? ' wifi' : '') + ' n' + (v < CRITICO_V || v >= CRITICO_V_ALTA ? 2 : v < AVISO_V || v >= AVISO_V_ALTA ? 1 : 0) + (i === celdaGraf ? ' elegida' : '') + '" type="button" data-celda="' + i + '" aria-pressed="' + (i === celdaGraf) + '"><small>Celda ' + (i + 1) + '</small><span>' + decimal(v, 3) + '</span><i style="width:' + Math.round((v - bajo) / rango * 100) + '%"></i>' + (i === cMax - 1 ? '<em>MÁX</em>' : i === cMin - 1 ? '<em>MÍN</em>' : '') + '</button>').join(''));
     poner('fi-rangos', botonesRango(rangoCelda, 'data-rango'));
-    poner('fi-leyenda', '<span>' + RANGOS[rangoCelda].titulo + (x.real ? '' : ' · simulado') + (x.d && x.d.wifiCan ? ' · <span class="c-wifi">celdas por Wi-Fi</span>' : '') + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>');
+    poner('fi-leyenda', '<span>' + RANGOS[rangoCelda].titulo + (x.real && !(x.d && x.d.ficticia) ? '' : ' · simulado') + (x.d && x.d.wifiCan ? ' · <span class="c-wifi">celdas por Wi-Fi</span>' : '') + '</span><span><i></i>Celda ' + (celdaGraf + 1) + '</span><span><i class="banda"></i>Entre la celda más alta y la más baja</span>');
     pintarGraficaCelda(x);
     pintarCaida(x);
   }
