@@ -122,6 +122,17 @@
   td.partir { white-space:normal; min-width:150px; }
   tr[data-ficha] { cursor:pointer; }
   tr[data-ficha]:hover td { background:var(--panel2); }
+  .pestanas { margin:0 0 12px; }
+  .busca-mapa { position:relative; z-index:1100; }
+  .desplegable { position:absolute; left:16px; right:16px; top:calc(100% - 12px); max-height:340px; overflow:auto; border:1px solid var(--linea); border-radius:8px; background:var(--panel); box-shadow:0 10px 28px rgba(0,0,0,.35); }
+  .desplegable h4 { margin:0; padding:8px 12px 4px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--suave); }
+  .desplegable button { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:44px; padding:6px 12px; border:0; border-top:1px solid var(--linea); background:none; color:var(--texto); font:inherit; text-align:left; cursor:pointer; }
+  .desplegable button:hover, .desplegable button.activo { background:var(--panel2); }
+  .desplegable small { display:block; color:var(--suave); font-size:12.5px; }
+  .desplegable .vacio { padding:12px; }
+  tr.fila-roja td { background:color-mix(in srgb, var(--rojo) 14%, transparent); }
+  tr[data-ficha-carga] { cursor:pointer; }
+  tr[data-ficha-carga]:hover td { background:var(--panel2); }
   .vacio { padding:18px 8px; color:var(--suave); text-align:center; font-size:14px; }
   .zona-fila { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:44px; padding:7px 0; border:0; border-bottom:1px solid var(--linea); background:none; text-align:left; cursor:pointer; }
   .zona-fila:last-child { border-bottom:0; }
@@ -303,6 +314,11 @@
 
   <main id="v-mapa" class="vista" hidden>
     <div class="pagina"><h1>Mapa de dispositivos</h1><div class="segmento" role="group" aria-label="Filtrar dispositivos" id="mapa-filtros"></div></div>
+    <section class="panel buscador busca-mapa" style="margin-bottom:12px">
+      <label for="buscar-mapa">Buscar batería en el mapa</label>
+      <input id="buscar-mapa" type="search" placeholder="Escribe o despliega: las que tienen anomalía salen primero" autocomplete="off" enterkeyhint="search" role="combobox" aria-expanded="false" aria-controls="mapa-lista" aria-autocomplete="list">
+      <div class="desplegable" id="mapa-lista" role="listbox" hidden></div>
+    </section>
     <section class="panel">
       <div id="mapa" class="mapa"></div>
       <div id="mapa-elegido"></div>
@@ -312,12 +328,20 @@
 
   <main id="v-baterias" class="vista" hidden>
     <div class="pagina"><h1>Baterías</h1><div class="segmento" role="group" aria-label="Filtrar baterías" id="bat-filtros"></div></div>
-    <section class="panel buscador" style="margin-bottom:12px">
-      <label for="buscar">Buscar batería</label>
-      <input id="buscar" type="search" placeholder="Ejemplo: B 01, Canet o Batería 1" autocomplete="off" enterkeyhint="search">
-      <p id="buscar-res" aria-live="polite" hidden></p>
-    </section>
-    <div class="pila" id="bat-grupos"></div>
+    <div class="segmento pestanas" role="group" aria-label="Apartado" id="bat-pestanas"></div>
+    <div id="bat-lista">
+      <section class="panel buscador" style="margin-bottom:12px">
+        <label for="buscar">Buscar batería</label>
+        <input id="buscar" type="search" placeholder="Ejemplo: B 01, Canet o Batería 1" autocomplete="off" enterkeyhint="search">
+        <p id="buscar-res" aria-live="polite" hidden></p>
+      </section>
+      <div class="pila" id="bat-grupos"></div>
+    </div>
+    <div class="pila" id="bat-cargas" hidden>
+      <div class="kpis" id="cg-kpis"></div>
+      <section class="panel"><div class="titulo"><h2>Registro de carga de todas las baterías</h2></div><div class="tabla-marco" id="cg-flota"></div><p class="pista">En rojo: la han desenchufado <span id="cg-umbral"></span> veces seguidas o más sin llegar al 100 %. Pulsa una batería para ver todas sus cargas.</p></section>
+      <section class="panel"><div class="titulo"><h2>Últimos enchufes y desenchufes</h2></div><div class="tabla-marco gy-lista" style="max-height:420px" id="cg-eventos"></div></section>
+    </div>
   </main>
 
   <main id="v-ficha" class="vista" hidden>
@@ -332,6 +356,11 @@
         <section class="panel"><div class="titulo"><h2>Ajustes</h2></div><div class="filas" id="fi-ajustes"></div></section>
         <section class="panel"><div class="titulo"><h2>Datos del BMS</h2><span id="fi-bms-estado"></span></div><div class="filas" id="fi-bms"></div></section>
       </div>
+      <section class="panel" aria-labelledby="t-carga">
+        <div class="titulo"><h2 id="t-carga">Registro de carga</h2><span id="fi-carga-estado"></span></div>
+        <div class="filas" id="fi-carga-resumen"></div>
+        <div class="gy-lista tabla-marco" style="max-height:340px" id="fi-cargas"></div>
+      </section>
       <section class="panel" aria-labelledby="t-gyro">
         <div class="titulo"><h2 id="t-gyro">GYRO</h2></div>
         <div class="filas" id="gy-estado"></div>
@@ -364,9 +393,12 @@
   <main id="v-comunicaciones" class="vista" hidden>
     <div class="pagina"><h1>Comunicaciones LoRa</h1></div>
     <div class="kpis" id="com-kpis"></div>
-    <div class="pila">
+    <div class="segmento pestanas" role="group" aria-label="Apartado" id="com-pestanas"></div>
+    <div class="pila" id="com-red">
       <section class="panel"><div class="titulo"><h2>Dispositivos emisores</h2></div><div class="tabla-marco" id="com-emisores"></div></section>
       <section class="panel"><div class="titulo"><h2>Estaciones receptoras</h2></div><div class="tabla-marco" id="com-estaciones"></div><p class="pista">Cada placa escucha a la otra por LoRa y sube los datos a internet si tiene Wi-Fi.</p></section>
+    </div>
+    <div class="pila" id="com-historial" hidden>
       <section class="panel"><div class="titulo"><h2>Historial de paquetes</h2></div><div class="tabla-marco" id="com-paquetes"></div><p class="pista">Se guarda en este dispositivo mientras la aplicación está abierta. SNR: las placas todavía no lo envían.</p></section>
     </div>
   </main>
@@ -576,6 +608,65 @@
   }
   const nivelDe = lista => lista.reduce((n, a) => Math.max(n, a.nivel), 0);
 
+  // --- Registro de carga: cuándo se enchufa y se desenchufa el cargador y hasta qué % llegó ---
+  // Cada carga es { ini, fin, socIni, socFin }; la más nueva primero y fin null mientras sigue enchufada
+  const CARGA_LLENA = 99, CORTES_ROJO = 3, CARGA_ON_A = 5, CARGA_OFF_A = 1, CARGA_CONFIRMA_MS = 15000;
+  NOMBRES_TIPO.cargas = 'Cargas sin terminar';
+  function apuntarCarga(log, enchufado, t, soc) {
+    const u = log[0], abierta = u && u.fin === null;
+    if (enchufado && !abierta) { log.unshift({ ini: t, fin: null, socIni: soc, socFin: null }); if (log.length > 300) log.length = 300; return true; }
+    if (!enchufado && abierta) { u.fin = t; u.socFin = soc; return true; }
+    return false;
+  }
+  // Cuántas veces seguidas (las últimas) se desenchufó sin llegar al 100 %
+  const cortesSeguidos = log => { let n = 0; for (const c of log) { if (c.fin === null) continue; if (c.socFin !== null && c.socFin >= CARGA_LLENA) break; n++; } return n; };
+  function resumenCargas(log) {
+    const dia = Date.now() - 864e5, hoy = log.filter(c => c.ini >= dia);
+    const cortes = cortesSeguidos(log);
+    return { cargando: !!(log[0] && log[0].fin === null), ultima: log[0] || null, n24: hoy.length, cortas24: hoy.filter(c => c.fin !== null && c.socFin < CARGA_LLENA).length, cortes, rojo: cortes >= CORTES_ROJO };
+  }
+  const alarmasCargas = log => {
+    const r = resumenCargas(log);
+    return r.rojo ? [{ tipo: 'cargas', nivel: 1, texto: 'Desenchufada ' + r.cortes + ' veces seguidas sin llegar al 100 %' }] : [];
+  };
+  // Baterías reales: se deduce de la corriente del BMS (más de 5 A entrando = cargador puesto) y se guarda en este móvil
+  const CARGAS_REAL = {}, vigiaCarga = {};
+  function cargasReal(id) {
+    if (!CARGAS_REAL[id]) {
+      let l = null;
+      try { l = JSON.parse(memoria.leer('cargas-' + id) || 'null'); } catch (e) { l = null; }
+      CARGAS_REAL[id] = Array.isArray(l) ? l : [];
+    }
+    return CARGAS_REAL[id];
+  }
+  function vigilarCargaReal(x) {
+    if (!x.conectado || x.corriente === null || x.corriente === undefined) return;
+    const log = cargasReal(x.id), v = vigiaCarga[x.id] || (vigiaCarga[x.id] = { desde: 0, quiere: null }), ahora = Date.now();
+    const abierta = log[0] && log[0].fin === null;
+    const quiere = abierta ? !(x.corriente < CARGA_OFF_A) : x.corriente > CARGA_ON_A;
+    if (quiere === abierta) { v.quiere = null; return; }
+    if (v.quiere !== quiere) { v.quiere = quiere; v.desde = ahora; return; }
+    if (ahora - v.desde < CARGA_CONFIRMA_MS) return;
+    if (apuntarCarga(log, quiere, v.desde, x.soc !== null && x.soc !== undefined ? Math.round(x.soc) : null)) memoria.guardar('cargas-' + x.id, JSON.stringify(log));
+    v.quiere = null;
+  }
+  // DEMO: una semana de cargas. Las «malas» las desenchufan muchas veces a medias en las últimas 24 h
+  const CARGAS_MALAS = ['F-01', 'C-07', 'D-12'];
+  function cargasDemo(b) {
+    const l = [], ahora = Date.now(), mala = CARGAS_MALAS.includes(b.id);
+    let t = ahora - 7 * 864e5 + azar(0, 6) * 36e5;
+    while (t < ahora - 3 * 36e5) {
+      const ultimas = mala && ahora - t < 864e5;
+      const corta = ultimas || Math.random() < 0.12;
+      const socIni = Math.round(azar(12, 55)), socFin = corta ? Math.min(94, socIni + Math.round(azar(5, 30))) : 100;
+      const dur = corta ? azar(10, 50) * 6e4 : (100 - socIni) * azar(2.4, 3.2) * 6e4;
+      l.unshift({ ini: t, fin: t + dur, socIni, socFin });
+      t += dur + (ultimas ? azar(0.6, 2.5) : azar(9, 22)) * 36e5;
+      if (mala && !ultimas && t > ahora - 864e5) t = Math.min(t, ahora - 20 * 36e5);   // que siempre tenga varias a medias en las últimas 24 h
+    }
+    return l;
+  }
+
   function dispositivoReal(c) {
     const e = ultimo || {}, d = e[c.nodo], otro = e[c.otro], aux = c.auxiliar ? e.bateria : null, tieneAux = !!aux && !!aux.hora;
     const x = { id: c.id, nombre: c.nombre, real: true, c, d, otro, aux: tieneAux ? aux : null, zona: c.zona.nombre, zonaId: c.zona.id, modelo: c.sinLora ? 'ESP32 sin LoRa' : 'wBMS-R24 o wBMS-R32', conectado: conectado(d), ultimaMs: d && d.hora ? d.hora - d.edad_s * 1000 : null };
@@ -603,6 +694,9 @@
         else if (v >= AUX_ALTA) x.alarmas.push({ tipo: 'tension_alta', nivel: 1, texto: 'Batería auxiliar a ' + decimal(v, 2) + ' V' });
       }
     }
+    vigilarCargaReal(x);
+    x.cargas = cargasReal(x.id);
+    x.alarmas = x.alarmas.concat(alarmasCargas(x.cargas));
     return x;
   }
 
@@ -611,7 +705,8 @@
     const x = { id: b.id, nombre: 'Batería ' + b.id, real: false, b, zona: b.pol.nombre, zonaId: b.pol.id, modelo: b.pol.modelo, conectado: !b.corteDesde, ultimaMs: b.corteDesde || Date.now(), lat: b.lat, lon: b.lon, celdas: b.corteDesde ? b.vCorte : v, tension: v.reduce((a, c) => a + c, 0), soc: b.soc, temp: tMax, rssi: b.rssi, snr: b.snr, corriente: b.corriente, soh: b.soh, tensionNota: '' };
     x.acel = b.acel;
     if (b.carretilla) x.modelo = b.pol.modelo;
-    x.alarmas = alarmasComunicacion(x).concat(alarmasCeldas(v), alarmasTemperatura(tMax), b.corteDesde ? [] : alarmasAcel(b.acel));
+    x.cargas = b.cargas;
+    x.alarmas = alarmasComunicacion(x).concat(alarmasCeldas(v), alarmasTemperatura(tMax), b.corteDesde ? [] : alarmasAcel(b.acel), alarmasCargas(b.cargas));
     return x;
   }
 
@@ -964,6 +1059,7 @@
     // Historial: las fijas, una posición cada 30 min en su sitio; las carretillas, su recorrido y golpes pasados
     const ahora = Date.now();
     demo.forEach(b => {
+      b.cargas = cargasDemo(b);
       b.hist = { golpes: [], pos: [] };
       if (!b.carretilla) { for (let k = 0; k < 12; k++) b.hist.pos.push({ t: ahora - k * 18e5, lat: b.lat, lon: b.lon, mov: false }); return; }
       for (let k = 1; k <= 60; k++) {
@@ -1006,13 +1102,15 @@
       const [u, v] = RUTA_CARRETILLA[b.tramo % RUTA_CARRETILLA.length], du = u - b.u, dv = v - b.vv, d = Math.hypot(du, dv), paso = 0.008;
       if (d <= paso) {
         b.u = u; b.vv = v; b.tramo++;
-        if (Math.random() < 0.35) { b.paradaHasta = ahora + azar(15000, 45000); b.cargando = Math.random() < 0.5; }
+        // Solo F-01 para a cargar a medias (la enchufan y desenchufan sin llegar al 100 %); F-02 solo carga y descarga mercancía
+        if (Math.random() < 0.35) { b.paradaHasta = ahora + azar(15000, 45000); b.cargando = CARGAS_MALAS.includes(b.id) && Math.random() < 0.5; }
       } else { b.u += du / d * paso; b.vv += dv / d * paso; }
       [b.lat, b.lon] = enZona(b.pol, b.u, b.vv);
       b.corriente = -azar(70, 85);
       if (Math.random() < 1 / 150) { a.golpes++; a.pico_g = azar(2.2, 4.2); a.golpe_hora = ahora; a.hora = ahora; apuntarGolpe(b.hist, ahora, a.pico_g, b.lat, b.lon); }
     } else b.corriente = b.cargando ? azar(78, 90) : Math.max(-8, b.corriente * 0.5);
     if (b.hist) apuntarPosicion(b.hist, ahora, b.lat, b.lon, !parada);
+    if (b.cargas) apuntarCarga(b.cargas, parada && b.cargando, ahora, Math.round(b.soc));
     if (a.moviendo !== !parada) a.hora = ahora;
     a.moviendo = !parada;
     a.inclinacion = parada ? azar(0.5, 1.5) : azar(1, 6);
@@ -1314,6 +1412,7 @@
     if (x.d && x.d.bms && Object.keys(x.d.bms).length) filasBms += filasBmsCan(x.d.bms);
     poner('fi-bms', filasBms);
     pintarGyro(x);
+    pintarCargasFicha(x);
 
     // Celdas
     $('fi-sin-celdas').hidden = !!x.celdas;
@@ -1582,9 +1681,55 @@
     if (socTexto(x)) a.push('SoC ' + socTexto(x));
     return '<button class="baldosa ' + e.baldosa + '" type="button" data-ficha="' + x.id + '"><strong>' + nombreConMarca(x) + '</strong><span>' + (x.real && !x.c.conNombre ? escapar(x.nombre) : '') + (x.real && !x.c.conNombre && a.length ? ' · ' : '') + a.join(' · ') + '</span><span>' + (x.ultimaMs ? (x.conectado ? (x.temp !== null && x.temp !== undefined ? Math.round(x.temp) + ' ºC · ' : '') + 'En línea' : 'Último ' + ultimoDatoTexto(x)) : 'Sin datos') + '</span><em>' + e.texto + '</em></button>';
   }
+  // Registro de carga: en la ficha y en la pestaña de todas las baterías
+  const socTxt = v => v === null || v === undefined ? '—' : Math.round(v) + ' %';
+  function duracion(ms) { const m = Math.max(1, Math.round(ms / 6e4)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') + ' min'; }
+  const llena = c => c.socFin !== null && c.socFin >= CARGA_LLENA;
+  const textoResultado = c => c.fin === null ? '<span class="c-verde">Cargando</span>' : llena(c) ? '<span class="c-verde">Completa</span>' : c.socFin === null ? suave('Sin dato') : '<b class="c-naranja">Sin llegar al 100 %</b>';
+  function pintarCargasFicha(x) {
+    const log = x.cargas || [], r = resumenCargas(log), sinCorriente = x.real && (x.corriente === null || x.corriente === undefined);
+    poner('fi-carga-estado', r.rojo ? '<span class="pastilla no">DESENCHUFADA SIN CARGAR</span>' : r.cargando ? '<span class="pastilla si">CARGANDO</span>' : '');
+    poner('fi-carga-resumen',
+      fila('Cargador', r.cargando ? '<span class="c-verde">Enchufado desde las ' + new Date(r.ultima.ini).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) + ' · ' + socTxt(r.ultima.socIni) + ' al enchufar</span>' : r.ultima ? 'Desenchufado ' + hace(Date.now() - r.ultima.fin) : suave(sinCorriente ? 'Sin datos: hace falta la corriente del BMS' : 'Sin cargas registradas')) +
+      fila('Cargas en las últimas 24 h', r.n24 + (r.cortas24 ? ' · <span class="c-naranja">' + r.cortas24 + ' sin llegar al 100 %</span>' : '')) +
+      fila('Seguidas sin llegar al 100 %', '<b class="' + (r.rojo ? 'c-rojo' : r.cortes ? 'c-naranja' : 'c-verde') + '">' + r.cortes + (r.rojo ? ' · la desenchufan antes de tiempo' : '') + '</b>'));
+    let racha = r.cortes;
+    poner('fi-cargas', log.length ? '<table><thead><tr><th>Enchufado</th><th>Desenchufado</th><th>Duración</th><th>Carga</th><th>Resultado</th></tr></thead><tbody>' + log.map(c => {
+      const roja = r.rojo && c.fin !== null && racha-- > 0;
+      return '<tr' + (roja ? ' class="fila-roja"' : '') + '><td>' + fechaCorta(c.ini) + '</td><td>' + (c.fin === null ? suave('Sigue enchufado') : fechaCorta(c.fin)) + '</td><td>' + duracion((c.fin || Date.now()) - c.ini) + '</td><td>' + socTxt(c.socIni) + ' → ' + (c.fin === null ? socTxt(x.soc) : socTxt(c.socFin)) + '</td><td>' + (roja ? '<b class="c-rojo">Sin llegar al 100 %</b>' : textoResultado(c)) + '</td></tr>';
+    }).join('') + '</tbody></table>' : '<p class="pista">' + (x.real ? 'Se registra en este dispositivo al ver entrar corriente del cargador (más de ' + CARGA_ON_A + ' A durante ' + CARGA_CONFIRMA_MS / 1000 + ' s).' : 'Sin cargas.') + '</p>');
+  }
+  let batPestana = 'lista', comPestana = 'red';
+  const botonesPestana = (lista, activa, attr) => lista.map(p => '<button type="button" ' + attr + '="' + p[0] + '" aria-pressed="' + (p[0] === activa) + '">' + p[1] + '</button>').join('');
+  function pintarCargasFlota() {
+    const lista = FL.filter(x => pasaFiltro(x, filtroBat)).map(x => ({ x, r: resumenCargas(x.cargas || []) }));
+    lista.sort((a, b) => b.r.rojo - a.r.rojo || b.r.cortes - a.r.cortes || b.r.cargando - a.r.cargando || a.x.id.localeCompare(b.x.id));
+    const rojas = lista.filter(e => e.r.rojo).length, cargando = lista.filter(e => e.r.cargando).length;
+    const n24 = lista.reduce((a, e) => a + e.r.n24, 0), cortas = lista.reduce((a, e) => a + e.r.cortas24, 0);
+    poner('cg-kpis',
+      kpi('baterias', 'Cargando ahora', cargando, 'Con el cargador enchufado', cargando ? 't-verde' : 't-gris', 'baterias') +
+      kpi('reloj', 'Cargas en 24 h', n24, cortas + ' sin llegar al 100 %', cortas ? 't-naranja' : 't-gris', 'baterias') +
+      kpi('aviso', 'Desenchufadas antes de tiempo', rojas, CORTES_ROJO + ' o más veces seguidas sin llegar al 100 %', rojas ? 't-rojo' : 't-verde', 'baterias'));
+    $('cg-umbral').textContent = CORTES_ROJO;
+    poner('cg-flota', lista.length ? '<table><thead><tr><th>Batería</th><th>Cargador</th><th>Última carga</th><th>Cargas 24 h</th><th>Seguidas sin 100 %</th><th>Estado</th></tr></thead><tbody>' + lista.map(({ x, r }) => {
+      const u = r.ultima, sinDatos = !u && x.real && (x.corriente === null || x.corriente === undefined);
+      return '<tr data-ficha-carga="' + x.id + '"' + (r.rojo ? ' class="fila-roja"' : '') + '><td>' + nombreConMarca(x) + '</td><td>' + (r.cargando ? '<span class="c-verde">Enchufado</span>' : u ? 'Desenchufado' : '—') + '</td><td>' + (u ? fechaCorta(u.ini) + ' · ' + socTxt(u.socIni) + ' → ' + (u.fin === null ? socTxt(x.soc) : socTxt(u.socFin)) : suave(sinDatos ? 'Sin corriente del BMS' : 'Sin cargas')) + '</td><td>' + r.n24 + (r.cortas24 ? ' ' + suave('(' + r.cortas24 + ' a medias)') : '') + '</td><td><b class="' + (r.rojo ? 'c-rojo' : r.cortes ? 'c-naranja' : 'c-verde') + '">' + r.cortes + '</b></td><td>' + (r.rojo ? '<span class="pastilla no">DESENCHUFA SIN CARGAR</span>' : r.cargando ? '<span class="pastilla si">CARGANDO</span>' : u ? '<span class="pastilla gris">BIEN</span>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>' : '<div class="vacio">Ninguna batería con este filtro.</div>');
+    const ev = [];
+    lista.forEach(({ x }) => (x.cargas || []).forEach(c => {
+      ev.push({ x, t: c.ini, on: true, soc: c.socIni });
+      if (c.fin !== null) ev.push({ x, t: c.fin, on: false, soc: c.socFin, corta: !llena(c) });
+    }));
+    ev.sort((a, b) => b.t - a.t);
+    poner('cg-eventos', ev.length ? '<table><thead><tr><th>Cuándo</th><th>Batería</th><th>Cargador</th><th>Carga</th></tr></thead><tbody>' + ev.slice(0, 200).map(e => '<tr data-ficha-carga="' + e.x.id + '"><td>' + fechaCorta(e.t) + '</td><td>' + nombreConMarca(e.x) + '</td><td>' + (e.on ? '<span class="c-verde">Enchufado</span>' : e.corta ? '<b class="c-rojo">Desenchufado sin llegar al 100 %</b>' : 'Desenchufado · completa') + '</td><td>' + socTxt(e.soc) + '</td></tr>').join('') + '</tbody></table>' : '<div class="vacio">Todavía no hay cargas registradas.</div>');
+  }
   function pintarBaterias() {
     const texto = $('buscar').value.trim(), q = plano(texto);
     poner('bat-filtros', botonesFiltro(filtroBat, 'data-filtro-bat'));
+    poner('bat-pestanas', botonesPestana([['lista', 'Baterías'], ['cargas', 'Registro de carga']], batPestana, 'data-pestana-bat'));
+    $('bat-lista').hidden = batPestana !== 'lista';
+    $('bat-cargas').hidden = batPestana !== 'cargas';
+    if (batPestana === 'cargas') pintarCargasFlota();
     const lista = FL.filter(x => pasaFiltro(x, filtroBat) && coincide(x, q));
     poner('bat-grupos', gruposPorZona(lista).map(z => '<section class="panel"><div class="titulo"><div class="titulo-izq"><h2>' + escapar(z.nombre) + '</h2>' + (z.demo ? marcaDemo : '') + '</div>' + suave(z.lista.length + (z.lista.length === 1 ? ' batería' : ' baterías') + (z.demo ? ' · ' + z.lista[0].modelo + ' · ' + z.lista[0].celdas.length + ' celdas' : '')) + '</div><div class="baldosas">' + z.lista.map(baldosa).join('') + '</div></section>').join('') || '<section class="panel"><div class="vacio">Ninguna batería coincide.</div></section>');
     $('buscar-res').hidden = !q;
@@ -1699,9 +1844,49 @@
         x.conectado && x.d.fix ? 'Posición actual · ' + coordenadas(x) : 'Última posición conocida · ' + coordenadas(x) + ' · Último dato de la placa ' + ultimoDatoTexto(x);
       poner('mapa-elegido', '<div class="barra-mapa"><span><b>' + nombreConMarca(x) + '</b> · ' + nota + '</span><span class="acciones"><button class="boton" type="button" data-ficha="' + x.id + '">Abrir ficha</button>' + (x.lat !== null ? '<a class="boton" target="_blank" rel="noopener" href="https://www.google.com/maps?q=' + x.lat.toFixed(5) + ',' + x.lon.toFixed(5) + '">Abrir en Google Maps</a>' : '') + '</span></div>');
     } else poner('mapa-elegido', '');
+    pintarListaMapa();
     const sinPos = FL.filter(n => n.lat === null && pasaFiltro(n, filtroMapa));
     poner('mapa-sinpos', sinPos.length ? '<p class="pista">Sin posición GPS, no aparecen en el mapa: ' + sinPos.map(n => '<button class="boton" style="min-height:32px;padding:2px 9px;margin:2px 3px" type="button" data-ficha="' + n.id + '">' + escapar(n.id) + '</button>').join('') + '</p>' : '');
     pintarMarcadores();
+  }
+  // Buscador del mapa: primero las que tienen alguna anomalía; al elegir una, el mapa va a ella y abre su ficha corta
+  let mapaActivo = 0, mapaOpciones = [];
+  function pintarListaMapa() {
+    const caja = $('mapa-lista');
+    if (caja.hidden) return;
+    const q = plano($('buscar-mapa').value.trim()), l = FL.filter(x => coincide(x, q));
+    const mal = l.filter(x => x.alarmas.length).sort((a, b) => nivelDe(b.alarmas) - nivelDe(a.alarmas) || a.id.localeCompare(b.id)), bien = l.filter(x => !x.alarmas.length);
+    mapaOpciones = mal.concat(bien);
+    mapaActivo = Math.max(0, Math.min(mapaActivo, mapaOpciones.length - 1));
+    const opcion = (x, i) => {
+      const peor = x.alarmas.length ? x.alarmas.reduce((m, n) => n.nivel > m.nivel ? n : m) : null;
+      return '<button type="button" role="option" id="mo-' + i + '" data-mapa-ir="' + x.id + '"' + (i === mapaActivo ? ' class="activo" aria-selected="true"' : ' aria-selected="false"') + '><span><b>' + nombreConMarca(x) + '</b><small>' + escapar(x.zona) + (peor ? ' · <span class="' + (peor.nivel === 2 ? 'c-rojo' : 'c-naranja') + '">' + escapar(NOMBRES_TIPO[peor.tipo] || '') + (x.alarmas.length > 1 ? ' y ' + (x.alarmas.length - 1) + ' más' : '') + '</span>' : '') + (x.lat === null ? ' · sin posición GPS' : '') + '</small></span>' + pastillaDe(x) + '</button>';
+    };
+    poner(caja, ((mal.length ? '<h4>Con anomalía (' + mal.length + ')</h4>' + mal.map(opcion).join('') : '') + (bien.length ? '<h4>Sin anomalías (' + bien.length + ')</h4>' + bien.map((x, i) => opcion(x, mal.length + i)).join('') : '')) || '<div class="vacio">Ninguna batería coincide.</div>');
+    $('buscar-mapa').setAttribute('aria-activedescendant', mapaOpciones.length ? 'mo-' + mapaActivo : '');
+  }
+  function abrirListaMapa(abrir) {
+    $('mapa-lista').hidden = !abrir;
+    $('buscar-mapa').setAttribute('aria-expanded', String(abrir));
+    if (abrir) pintarListaMapa();
+  }
+  function irEnMapa(id) {
+    const x = dispPorId(id);
+    if (!x) return;
+    abrirListaMapa(false);
+    $('buscar-mapa').value = '';
+    $('buscar-mapa').blur();
+    elegido = id;
+    if (!pasaFiltro(x, filtroMapa)) filtroMapa = 'todos';
+    pintarMapa();
+    if (!mapa || x.lat === null) return;
+    mapa.closePopup();
+    mapa.setView([x.lat, x.lon], x.real ? 17 : 18, { animate: false });
+    verCapas();
+    pintarMarcadores();
+    const m = marcadores[x.id];
+    if (m && mapa.hasLayer(m)) m.openPopup();
+    $('mapa').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   function montarMapa() {
     cargarLeaflet().then(L => {
@@ -1747,6 +1932,9 @@
       const d = e.x.d, oido = d && d.rssi_lora && e.x.conectado;
       return '<tr><td>Placa de ' + escapar(e.x.id) + '</td><td>' + (e.activa ? '<span class="pastilla lora">ACTIVA</span>' : '<span class="pastilla gris">INACTIVA</span>') + '</td><td>' + escapar((FLOTA.find(c => c.nodo === e.x.c.otro) || {}).id || '—') + '</td><td class="c-lora">' + (oido ? d.rssi_lora + ' dB' : '—') + '</td><td>' + (d && d.wifi_red ? escapar(d.wifi_red) + (e.activa ? rayas(rayasWifi(d.rssi_wifi)) : '') : '—') + '</td><td>' + (d && d.wifi_hora ? hace(Date.now() - d.wifi_hora) : '—') + '</td></tr>';
     }).join('') + '</tbody></table>');
+    poner('com-pestanas', botonesPestana([['red', 'Emisores y estaciones'], ['paquetes', 'Historial de paquetes']], comPestana, 'data-pestana-com'));
+    $('com-red').hidden = comPestana !== 'red';
+    $('com-historial').hidden = comPestana !== 'paquetes';
     const pq = recientes.slice(0, 40);
     poner('com-paquetes', pq.length ? '<table><thead><tr><th scope="col">Fecha</th><th scope="col">Dispositivo</th><th scope="col">Ruta</th><th scope="col">RSSI</th><th scope="col">SNR</th><th scope="col">GPS</th></tr></thead><tbody>' + pq.map(p => '<tr><td>' + fechaCorta(p.t) + '</td><td>' + escapar(p.dev) + '</td><td>' + escapar(p.ruta || '—') + '</td><td class="c-lora">' + (p.rssi ? p.rssi + ' dB' : '—') + '</td><td>' + (p.snr !== null && p.snr !== undefined ? decimal(p.snr, 1) + ' dB' : '—') + '</td><td>' + (p.fix ? p.sats + ' sat.' : 'Sin fijar') + '</td></tr>').join('') + '</tbody></table>' : '<div class="vacio">Aún no ha llegado ningún paquete desde que la aplicación está abierta en este dispositivo.</div>');
   }
@@ -1887,10 +2075,15 @@
   });
 
   document.addEventListener('click', ev => {
-    const el = ev.target.closest('[data-volver],[data-ir],[data-ficha],[data-rango],[data-celda],[data-caida-celda],[data-caida-col],[data-gr-rango],[data-filtro-bat],[data-filtro-mapa],[data-modo-alarmas],[data-tema],[data-demo-cambiar],[data-demo-fallo],[data-demo-corte],[data-demo-reiniciar],[data-buscar-zona]');
+    if (!ev.target.closest('.busca-mapa') && !$('mapa-lista').hidden) abrirListaMapa(false);
+    const el = ev.target.closest('[data-mapa-ir],[data-ficha-carga],[data-pestana-bat],[data-pestana-com],[data-volver],[data-ir],[data-ficha],[data-rango],[data-celda],[data-caida-celda],[data-caida-col],[data-gr-rango],[data-filtro-bat],[data-filtro-mapa],[data-modo-alarmas],[data-tema],[data-demo-cambiar],[data-demo-fallo],[data-demo-corte],[data-demo-reiniciar],[data-buscar-zona]');
     if (!el) return;
     const D = el.dataset;
-    if ('volver' in D) history.back();
+    if (D.mapaIr) irEnMapa(D.mapaIr);
+    else if (D.fichaCarga) { ir('ficha', D.fichaCarga); $('t-carga').scrollIntoView({ block: 'start' }); }
+    else if (D.pestanaBat) { batPestana = D.pestanaBat; pintarBaterias(); }
+    else if (D.pestanaCom) { comPestana = D.pestanaCom; pintarComunicaciones(); }
+    else if ('volver' in D) history.back();
     else if (D.ir) { if (D.ir !== vista) ir(D.ir); }
     else if (D.ficha) ir('ficha', D.ficha);
     else if (D.rango) { rangoCelda = D.rango; pintarFicha(); }
@@ -1913,6 +2106,22 @@
     else if (D.buscarZona) { $('buscar').value = D.buscarZona; filtroBat = 'todos'; ir('baterias'); }
   });
   $('buscar').addEventListener('input', pintarBaterias);
+  $('buscar-mapa').addEventListener('focus', () => abrirListaMapa(true));
+  $('buscar-mapa').addEventListener('click', () => { if ($('mapa-lista').hidden) abrirListaMapa(true); });
+  $('buscar-mapa').addEventListener('input', () => { mapaActivo = 0; abrirListaMapa(true); $('mapa-lista').scrollTop = 0; });
+  $('buscar-mapa').addEventListener('keydown', ev => {
+    if (ev.key === 'Escape') { abrirListaMapa(false); return; }
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      if ($('mapa-lista').hidden) { abrirListaMapa(true); return; }
+      mapaActivo = Math.max(0, Math.min(mapaOpciones.length - 1, mapaActivo + (ev.key === 'ArrowDown' ? 1 : -1)));
+      pintarListaMapa();
+      const b = $('mo-' + mapaActivo);
+      if (b) b.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (ev.key === 'Enter' && mapaOpciones[mapaActivo]) { ev.preventDefault(); irEnMapa(mapaOpciones[mapaActivo].id); }
+  });
   $('buscar').addEventListener('keydown', ev => {
     if (ev.key !== 'Enter') return;
     const lista = pintarBaterias();
