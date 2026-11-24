@@ -678,7 +678,7 @@
     if (c.red) { x.modelo = 'LI-Net'; x.tensionNota = bms.simulado ? 'Dato simulado' : ''; }
     if (x.tension === null && x.celdas) x.tension = x.celdas.reduce((a, v) => a + v, 0);
     if (x.tension === null && tieneAux) { x.tension = aux.voltios; x.tensionNota = conectado(aux) ? 'Sensor de batería auxiliar' : 'Sensor auxiliar · dato antiguo'; }
-    x.soc = opcional(bms.soc); x.temp = opcional(bms.temp); x.rssi = bms.rssi_lora || null; x.snr = opcional(bms.snr); x.corriente = opcional(bms.corriente); x.soh = opcional(bms.soh);
+    x.ciclos = opcional(bms.bms && bms.bms.ciclos_eq); x.soc = opcional(bms.soc); x.temp = opcional(bms.temp); x.rssi = bms.rssi_lora || null; x.snr = opcional(bms.snr); x.corriente = opcional(bms.corriente); x.soh = opcional(bms.soh);
     x.alarmas = [];
     if (d) {
       x.alarmas = alarmasComunicacion(x).concat(alarmasAnomalas(d));
@@ -705,7 +705,7 @@
     const x = { id: b.id, nombre: 'Batería ' + b.id, real: false, b, zona: b.pol.nombre, zonaId: b.pol.id, modelo: b.pol.modelo, conectado: !b.corteDesde, ultimaMs: b.corteDesde || Date.now(), lat: b.lat, lon: b.lon, celdas: b.corteDesde ? b.vCorte : v, tension: v.reduce((a, c) => a + c, 0), soc: b.soc, temp: tMax, rssi: b.rssi, snr: b.snr, corriente: b.corriente, soh: b.soh, tensionNota: '' };
     x.acel = b.acel;
     if (b.carretilla) x.modelo = b.pol.modelo;
-    x.cargas = b.cargas;
+    x.cargas = b.cargas; x.ciclos = b.ciclos;
     x.alarmas = alarmasComunicacion(x).concat(alarmasCeldas(v), alarmasTemperatura(tMax), b.corteDesde ? [] : alarmasAcel(b.acel), alarmasCargas(b.cargas));
     return x;
   }
@@ -1060,6 +1060,7 @@
     const ahora = Date.now();
     demo.forEach(b => {
       b.cargas = cargasDemo(b);
+      b.ciclos = azar(150, 950);   // ciclos equivalentes: cada 100 % cargado es un ciclo
       b.hist = { golpes: [], pos: [] };
       if (!b.carretilla) { for (let k = 0; k < 12; k++) b.hist.pos.push({ t: ahora - k * 18e5, lat: b.lat, lon: b.lon, mov: false }); return; }
       for (let k = 1; k <= 60; k++) {
@@ -1082,6 +1083,7 @@
     const parada = b.v.length && nivelDe(alarmasCeldas(b.v)) === 2;
     b.corriente = parada ? 0 : Math.max(-90, Math.min(90, b.corriente + azar(-4, 4)));
     b.soc = Math.max(15, Math.min(98, b.soc + b.corriente * 0.0007));
+    if (b.corriente > 0 && b.ciclos) b.ciclos += b.corriente * 0.0007 / 100;
     b.rssi = Math.round(Math.max(-118, Math.min(-68, b.rssi + azar(-1.2, 1.2))));
     b.snr = Math.max(-5, Math.min(12, b.snr + azar(-0.2, 0.2)));
     const base = 3.2 + 0.0012 * b.soc + b.corriente * 0.0002;
@@ -1365,6 +1367,7 @@
       '<div class="medida"><small>Ubicación</small><b style="font-size:14.5px">' + ubic + '</b></div>',
       medida('Tensión total', x.tension !== null ? '<b>' + decimal(x.tension, x.tension > 30 ? 1 : 2) + ' V</b>' : noDisp(sinBms), x.tensionNota),
       medida('Carga', socTexto(x) ? '<b>' + socTexto(x) + '</b>' : noDisp(sinBms)),
+      medida('Ciclos de carga', x.ciclos !== null && x.ciclos !== undefined ? '<b>' + Math.floor(x.ciclos) + '</b>' : noDisp(sinBms), 'Ciclos completos equivalentes'),
       medida('Temperatura', x.temp !== null && x.temp !== undefined ? '<b>' + decimal(x.temp, 1) + ' ºC</b>' : noDisp(sinBms)),
       medida('Comunicación', '<b class="' + (x.conectado ? 'c-verde' : 'c-rojo') + '" style="font-size:14.5px">' + (x.conectado ? 'En línea' : (x.real && !x.d ? 'Sin datos' : 'No conectado')) + '</b>'),
       medida('RSSI', x.rssi ? '<b class="c-lora">' + x.rssi + ' dB</b>' : noDisp('No disponible')),
@@ -1393,7 +1396,7 @@
     let filasBms = fila('Modelo', escapar(x.modelo)) +
       fila('Tensión total', nv(x.tension !== null && x.celdas ? decimal(x.tension, 1) + ' V' : '—')) +
       fila('Corriente', nv(x.corriente !== null && x.corriente !== undefined ? decimal(x.corriente, 1) + ' A' : '—')) +
-      fila('Carga (SoC)', nv(socTexto(x) || '—')) + fila('Salud (SoH)', nv(x.soh !== null && x.soh !== undefined ? Math.round(x.soh) + ' %' : '—')) +
+      fila('Carga (SoC)', nv(socTexto(x) || '—')) + fila('Salud (SoH)', nv(x.soh !== null && x.soh !== undefined ? Math.round(x.soh) + ' %' : '—')) + fila('Ciclos de carga', nv(x.ciclos !== null && x.ciclos !== undefined ? String(Math.floor(x.ciclos)) : '—')) +
       fila('Temperatura máxima', nv(x.temp !== null && x.temp !== undefined ? decimal(x.temp, 1) + ' ºC' : '—'));
     if (x.aux) filasBms += fila('Batería auxiliar', decimal(x.aux.voltios, 2) + ' V') + fila('Relé', x.aux.rele ? 'Activado' : 'Desactivado');
     const w = x.d && x.d.wifiCan;
@@ -1711,9 +1714,9 @@
       kpi('reloj', 'Cargas en 24 h', n24, cortas + ' sin llegar al 100 %', cortas ? 't-naranja' : 't-gris', 'baterias') +
       kpi('aviso', 'Desenchufadas antes de tiempo', rojas, CORTES_ROJO + ' o más veces seguidas sin llegar al 100 %', rojas ? 't-rojo' : 't-verde', 'baterias'));
     $('cg-umbral').textContent = CORTES_ROJO;
-    poner('cg-flota', lista.length ? '<table><thead><tr><th>Batería</th><th>Cargador</th><th>Última carga</th><th>Cargas 24 h</th><th>Seguidas sin 100 %</th><th>Estado</th></tr></thead><tbody>' + lista.map(({ x, r }) => {
+    poner('cg-flota', lista.length ? '<table><thead><tr><th>Batería</th><th>Cargador</th><th>Última carga</th><th>Ciclos</th><th>Cargas 24 h</th><th>Seguidas sin 100 %</th><th>Estado</th></tr></thead><tbody>' + lista.map(({ x, r }) => {
       const u = r.ultima, sinDatos = !u && x.real && (x.corriente === null || x.corriente === undefined);
-      return '<tr data-ficha-carga="' + x.id + '"' + (r.rojo ? ' class="fila-roja"' : '') + '><td>' + nombreConMarca(x) + '</td><td>' + (r.cargando ? '<span class="c-verde">Enchufado</span>' : u ? 'Desenchufado' : '—') + '</td><td>' + (u ? fechaCorta(u.ini) + ' · ' + socTxt(u.socIni) + ' → ' + (u.fin === null ? socTxt(x.soc) : socTxt(u.socFin)) : suave(sinDatos ? 'Sin corriente del BMS' : 'Sin cargas')) + '</td><td>' + r.n24 + (r.cortas24 ? ' ' + suave('(' + r.cortas24 + ' a medias)') : '') + '</td><td><b class="' + (r.rojo ? 'c-rojo' : r.cortes ? 'c-naranja' : 'c-verde') + '">' + r.cortes + '</b></td><td>' + (r.rojo ? '<span class="pastilla no">DESENCHUFA SIN CARGAR</span>' : r.cargando ? '<span class="pastilla si">CARGANDO</span>' : u ? '<span class="pastilla gris">BIEN</span>' : '') + '</td></tr>';
+      return '<tr data-ficha-carga="' + x.id + '"' + (r.rojo ? ' class="fila-roja"' : '') + '><td>' + nombreConMarca(x) + '</td><td>' + (r.cargando ? '<span class="c-verde">Enchufado</span>' : u ? 'Desenchufado' : '—') + '</td><td>' + (u ? fechaCorta(u.ini) + ' · ' + socTxt(u.socIni) + ' → ' + (u.fin === null ? socTxt(x.soc) : socTxt(u.socFin)) : suave(sinDatos ? 'Sin corriente del BMS' : 'Sin cargas')) + '</td><td>' + (x.ciclos !== null && x.ciclos !== undefined ? Math.floor(x.ciclos) : '—') + '</td><td>' + r.n24 + (r.cortas24 ? ' ' + suave('(' + r.cortas24 + ' a medias)') : '') + '</td><td><b class="' + (r.rojo ? 'c-rojo' : r.cortes ? 'c-naranja' : 'c-verde') + '">' + r.cortes + '</b></td><td>' + (r.rojo ? '<span class="pastilla no">DESENCHUFA SIN CARGAR</span>' : r.cargando ? '<span class="pastilla si">CARGANDO</span>' : u ? '<span class="pastilla gris">BIEN</span>' : '') + '</td></tr>';
     }).join('') + '</tbody></table>' : '<div class="vacio">Ninguna batería con este filtro.</div>');
     const ev = [];
     lista.forEach(({ x }) => (x.cargas || []).forEach(c => {
