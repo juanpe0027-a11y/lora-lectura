@@ -631,10 +631,14 @@
   };
   // Baterías reales: se deduce de la corriente del BMS (más de 5 A entrando = cargador puesto) y se guarda en este móvil
   const CARGAS_REAL = {}, vigiaCarga = {};
+  // Las cargas apuntadas antes de ignorar el BMS simulado eran falsas: se borran una vez
+  const LIMPIEZA_CARGAS = memoria.leer('cargas-limpias') !== '1';
+  memoria.guardar('cargas-limpias', '1');
   function cargasReal(id) {
     if (!CARGAS_REAL[id]) {
       let l = null;
-      try { l = JSON.parse(memoria.leer('cargas-' + id) || 'null'); } catch (e) { l = null; }
+      if (!LIMPIEZA_CARGAS) try { l = JSON.parse(memoria.leer('cargas-' + id) || 'null'); } catch (e) { l = null; }
+      else memoria.guardar('cargas-' + id, '[]');
       CARGAS_REAL[id] = Array.isArray(l) ? l : [];
     }
     return CARGAS_REAL[id];
@@ -695,8 +699,9 @@
         else if (v >= AUX_ALTA) x.alarmas.push({ tipo: 'tension_alta', nivel: 1, texto: 'Batería auxiliar a ' + decimal(v, 2) + ' V' });
       }
     }
-    vigilarCargaReal(x);
-    x.cargas = cargasReal(x.id);
+    // Con el BMS simulado (sin CAN) la corriente es inventada: ni se apuntan cargas ni hay aviso
+    if (!bms.simulado) vigilarCargaReal(x);
+    x.cargas = bms.simulado ? [] : cargasReal(x.id);
     x.alarmas = x.alarmas.concat(alarmasCargas(x.cargas));
     return x;
   }
@@ -892,9 +897,9 @@
     const p = d && d.pila;
     if (!p) return suave('La placa aún no lo envía');
     if (Date.now() - p.hora > 120000) return suave('Sin datos recientes');
-    if (!p.hay) return 'Por USB ' + suave('· sin pila o sin leer');
+    if (!p.hay) return 'Por USB';
     const clase = p.pct < 10 ? 'c-rojo' : p.pct < 20 ? 'c-naranja' : 'c-verde';
-    return '<b class="' + clase + '">' + p.pct + ' %</b>' + suave(' · ' + decimal(p.v, 2) + ' V · con USB marca la carga, no la real');
+    return '<b class="' + clase + '">' + p.pct + ' %</b>';
   }
   // Solo se aceptan números y valores conocidos: los datos nunca se tratan como código de la página
   function limpiarNodo(d) {
