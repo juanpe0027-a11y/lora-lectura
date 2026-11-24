@@ -684,6 +684,7 @@
       x.alarmas = alarmasComunicacion(x).concat(alarmasAnomalas(d));
       if (x.conectado) {
         x.alarmas = x.alarmas.concat(alarmasCeldas(x.celdas), alarmasTemperatura(x.temp), alarmasAcel(d.acel));
+        if (d.pila && d.pila.hay && d.pila.pct < 20 && Date.now() - d.pila.hora < 120000) x.alarmas.push({ tipo: 'comunicacion', nivel: d.pila.pct < 10 ? 2 : 1, texto: 'Pila de la placa al ' + d.pila.pct + ' %' });
         if (otro && conectado(otro) && !d.rssi_lora) x.alarmas.push({ tipo: 'comunicacion', nivel: 1, texto: 'Enlace LoRa sin señal' });
       }
       if (tieneAux && conectado(aux) && !x.celdas) {
@@ -887,6 +888,14 @@
     });
   }
 
+  function textoPila(d) {
+    const p = d && d.pila;
+    if (!p) return suave('La placa aún no lo envía');
+    if (Date.now() - p.hora > 120000) return suave('Sin datos recientes');
+    if (!p.hay) return 'Por USB ' + suave('· sin pila o sin leer');
+    const clase = p.pct < 10 ? 'c-rojo' : p.pct < 20 ? 'c-naranja' : 'c-verde';
+    return '<b class="' + clase + '">' + p.pct + ' %</b>' + suave(' · ' + decimal(p.v, 2) + ' V · con USB marca la carga, no la real');
+  }
   // Solo se aceptan números y valores conocidos: los datos nunca se tratan como código de la página
   function limpiarNodo(d) {
     if (!d || typeof d !== 'object') return undefined;
@@ -900,6 +909,8 @@
     if (Array.isArray(d.sondas) && d.sondas.length <= 16 && d.sondas.every(v => Number.isFinite(Number(v)))) r.sondas = d.sondas.map(Number);
     if (Number.isInteger(d.balanceo) && d.balanceo >= 0 && d.balanceo < 256) r.balanceo = [0, 1, 2, 3, 4, 5, 6, 7].filter(i => d.balanceo >> i & 1).map(i => i + 1);
     r.celdas_hora = numero(d.celdas_hora);
+    // Pila 18650 de la propia Heltec (hay = false: va por USB, sin pila)
+    if (d.pila && typeof d.pila === 'object' && numero(d.pila.hora)) r.pila = { hay: d.pila.hay === true, v: numero(d.pila.v), pct: Math.max(0, Math.min(100, numero(d.pila.pct))), hora: numero(d.pila.hora) };
     // Acelerómetro: solo llega cuando cambia algo
     if (d.acel && typeof d.acel === 'object' && numero(d.acel.hora)) r.acel = { moviendo: d.acel.moviendo === true, volcada: d.acel.volcada === true, golpes: numero(d.acel.golpes), pico_g: numero(d.acel.pico_g), inclinacion: numero(d.acel.inclinacion), hora: numero(d.acel.hora) };
     if (d.bms && typeof d.bms === 'object') {
@@ -1378,6 +1389,7 @@
       const rpi = !!(x.d && x.d.pasarelaRpi), esPasarela = x.c.red === 1 && !rpi;
       const papel = esPasarela ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo';
       poner('fi-ajustes', fila('Papel', papel) + fila('Wi-Fi de la pasarela', textoWifi(x.d)) +
+        fila('Pila 18650 de la placa', textoPila(x.d)) +
         fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
         fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')) +
