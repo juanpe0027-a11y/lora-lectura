@@ -880,7 +880,7 @@
       ultimaHora[c.id] = d.hora;
       const e = ultimo, aux = c.auxiliar ? e.bateria : null;
       const directo = d.wifi_hora && Math.abs(d.wifi_hora - d.hora) < 3000;
-      const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: c.red === 1 ? 'Pasarela' : c.red ? 'LoRa por turnos' : c.sinLora ? 'ESP-NOW' : directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
+      const p = { dev: c.id, t: d.hora - d.edad_s * 1000, rssi: d.rssi_lora || null, snr: opcional(d.snr), placa: d.placa_v || null, sats: d.sats, fix: d.fix, ruta: c.red === 1 && !d.pasarelaRpi ? 'Pasarela' : c.red ? 'LoRa por turnos' : c.sinLora ? 'ESP-NOW' : directo ? 'Wi-Fi propio' : 'LoRa', tension: opcional(d.tension) };
       if (d.celdas) { p.c = d.celdas; p.vmin = Math.min(...d.celdas); p.vmax = Math.max(...d.celdas); p.tension = d.celdas.reduce((a, v) => a + v, 0); }
       if (p.tension === null && aux && aux.hora && conectado(aux)) p.tension = aux.voltios;
       p.soc = opcional(d.soc); p.temp = opcional(d.temp); p.i = opcional(d.corriente);
