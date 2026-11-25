@@ -631,6 +631,7 @@
   };
   // Baterías reales: se deduce de la corriente del BMS (más de 5 A entrando = cargador puesto) y se guarda en este móvil
   const CARGAS_REAL = {}, vigiaCarga = {};
+  const CARGAS_FIABLES_DESDE = Date.parse('2026-11-25T21:00:00+01:00');
   // Las cargas apuntadas antes de ignorar el BMS simulado eran falsas: se borran una vez
   const LIMPIEZA_CARGAS = memoria.leer('cargas-limpias') !== '1';
   memoria.guardar('cargas-limpias', '1');
@@ -639,7 +640,8 @@
       let l = null;
       if (!LIMPIEZA_CARGAS) try { l = JSON.parse(memoria.leer('cargas-' + id) || 'null'); } catch (e) { l = null; }
       else memoria.guardar('cargas-' + id, '[]');
-      CARGAS_REAL[id] = Array.isArray(l) ? l : [];
+      // Lo apuntado antes de esta fecha venía del BMS simulado (una pestaña antigua lo volvió a guardar): no cuenta
+      CARGAS_REAL[id] = (Array.isArray(l) ? l : []).filter(c => c && c.ini >= CARGAS_FIABLES_DESDE);
     }
     return CARGAS_REAL[id];
   }
@@ -1342,11 +1344,11 @@
 
   // Datos del BMS por CAN (mensajes 0x200 a 0x480, como las placas 4G). Se muestran como llegan del BMS.
   const CAMPOS_BMS = [
-    ['Resumen (0x200 · 0x202)', [['corriente_media', 'Corriente media', 'A', 1], ['v_celda_media', 'Tensión media de celda', 'mV'], ['celdas', 'Número de celdas'], ['capacidad', 'Capacidad'], ['soh', 'Salud (SoH)', '%'], ['error', 'Estado de error'], ['pines', 'Estado de pines'], ['t_max_esclavo', 'Temperatura máx. esclavo', 'ºC'], ['t_min_esclavo', 'Temperatura mín. esclavo', 'ºC'], ['eth', 'E_T_H'], ['etl', 'E_T_L']]],
-    ['Celdas (0x204)', [['v_celda_max', 'Celda más alta', 'mV'], ['celda_alta', 'Nº celda más alta'], ['v_celda_min', 'Celda más baja', 'mV'], ['celda_baja', 'Nº celda más baja'], ['delta', 'Diferencia', 'mV'], ['v_celda_max_pico', 'Pico de celda máx.', 'mV'], ['v_celda_min_pico', 'Pico de celda mín.', 'mV'], ['t_celda_max', 'Temperatura celda máx.', 'ºC'], ['t_celda_min', 'Temperatura celda mín.', 'ºC'], ['pico_carga', 'Pico de carga', 'A', 1], ['pico_descarga', 'Pico de descarga', 'A', 1]]],
-    ['Funcionamiento (0x380 · 0x394)', [['modo', 'Modo de funcionamiento'], ['t_pdmu1', 'Temperatura PDMU 1', 'ºC'], ['t_pdmu2', 'Temperatura PDMU 2', 'ºC'], ['t_pdmu3', 'Temperatura PDMU 3', 'ºC'], ['bmu_paralelo', 'BMU en paralelo'], ['t_max_id', 'Celda de temp. máx.'], ['t_min_id', 'Celda de temp. mín.'], ['t_cmu_max', 'Temperatura CMU máx.', 'ºC'], ['t_cmu_min', 'Temperatura CMU mín.', 'ºC'], ['soc_ocv', 'SoC por OCV', '%'], ['cmu_encontradas', 'CMU encontradas']]],
-    ['Protecciones (0x390 · 0x392)', [['uvpc', 'UVPC'], ['ovpc', 'OVPC'], ['utpc', 'UTPC'], ['otpc', 'OTPC'], ['ocpc', 'OCPC'], ['mmcc', 'MMCC'], ['mmdc', 'MMDC'], ['max_ct', 'Temp. máx. celda'], ['min_ct', 'Temp. mín. celda']]],
-    ['Historial (0x410 · 0x412 · 0x414)', [['ciclos_eq', 'Ciclos equivalentes'], ['ciclos_desde_carga', 'Ciclos desde carga completa'], ['cargas_completas', 'Cargas completas'], ['descargas_completas', 'Descargas completas'], ['ah_cargados', 'Total cargado', 'Ah', 1], ['ah_descargados', 'Total descargado', 'Ah', 1], ['kwh_cargados', 'Energía cargada', 'kWh', 1], ['kwh_descargados', 'Energía descargada', 'kWh', 1]]],
+    ['Resumen', [['corriente_media', 'Corriente media', 'A', 1], ['v_celda_media', 'Tensión media de celda', 'mV'], ['celdas', 'Número de celdas'], ['capacidad', 'Capacidad'], ['soh', 'Salud (SoH)', '%'], ['error', 'Estado de error'], ['pines', 'Estado de pines'], ['t_max_esclavo', 'Temperatura máx. esclavo', 'ºC'], ['t_min_esclavo', 'Temperatura mín. esclavo', 'ºC'], ['eth', 'E_T_H'], ['etl', 'E_T_L']]],
+    ['Celdas', [['v_celda_max', 'Celda más alta', 'mV'], ['celda_alta', 'Nº celda más alta'], ['v_celda_min', 'Celda más baja', 'mV'], ['celda_baja', 'Nº celda más baja'], ['delta', 'Diferencia', 'mV'], ['v_celda_max_pico', 'Pico de celda máx.', 'mV'], ['v_celda_min_pico', 'Pico de celda mín.', 'mV'], ['t_celda_max', 'Temperatura celda máx.', 'ºC'], ['t_celda_min', 'Temperatura celda mín.', 'ºC'], ['pico_carga', 'Pico de carga', 'A', 1], ['pico_descarga', 'Pico de descarga', 'A', 1]]],
+    ['Funcionamiento', [['modo', 'Modo de funcionamiento'], ['t_pdmu1', 'Temperatura PDMU 1', 'ºC'], ['t_pdmu2', 'Temperatura PDMU 2', 'ºC'], ['t_pdmu3', 'Temperatura PDMU 3', 'ºC'], ['bmu_paralelo', 'BMU en paralelo'], ['t_max_id', 'Celda de temp. máx.'], ['t_min_id', 'Celda de temp. mín.'], ['t_cmu_max', 'Temperatura CMU máx.', 'ºC'], ['t_cmu_min', 'Temperatura CMU mín.', 'ºC'], ['soc_ocv', 'SoC por OCV', '%'], ['cmu_encontradas', 'CMU encontradas']]],
+    ['Protecciones', [['uvpc', 'UVPC'], ['ovpc', 'OVPC'], ['utpc', 'UTPC'], ['otpc', 'OTPC'], ['ocpc', 'OCPC'], ['mmcc', 'MMCC'], ['mmdc', 'MMDC'], ['max_ct', 'Temp. máx. celda'], ['min_ct', 'Temp. mín. celda']]],
+    ['Historial', [['ciclos_eq', 'Ciclos equivalentes'], ['ciclos_desde_carga', 'Ciclos desde carga completa'], ['cargas_completas', 'Cargas completas'], ['descargas_completas', 'Descargas completas'], ['ah_cargados', 'Total cargado', 'Ah', 1], ['ah_descargados', 'Total descargado', 'Ah', 1], ['kwh_cargados', 'Energía cargada', 'kWh', 1], ['kwh_descargados', 'Energía descargada', 'kWh', 1]]],
   ];
   function filasBmsCan(b) {
     let h = '';
@@ -1361,7 +1363,7 @@
       const limpio = /^0+$/.test(b[k]);
       return fila(nombre, limpio ? '<span class="c-verde">Ninguno</span>' : '<span class="c-naranja">' + b[k].match(/.{2}/g).join(' ') + '</span>');
     };
-    const f = fallos('errores', 'Errores (0x420 · 0x440)') + fallos('avisos', 'Avisos (0x460 · 0x480)');
+    const f = fallos('errores', 'Errores') + fallos('avisos', 'Avisos');
     if (f) h += '<div class="fila"><b style="color:var(--turquesa)">Errores y avisos</b><span class="val"></span></div>' + f;
     if (b.hora) h += fila('Último dato del BMS', suave(fechaHora(b.hora)));
     return h;
@@ -1423,9 +1425,9 @@
         fila('Celdas', m(w.celdas.length + ' celdas, de ' + decimal(Math.min(...w.celdas), 3) + ' a ' + decimal(Math.max(...w.celdas), 3) + ' V')) +
         (w.sondas ? w.sondas.map((v, i) => fila('Sensor de temperatura ' + (i + 1), m(decimal(v, 1) + ' ºC'))).join('') : '') +
         (w.balanceo ? fila('Balanceando', m(w.balanceo.length ? 'Celdas ' + w.balanceo.join(', ') : 'Ninguna')) : '') +
-        (w.vPack !== null ? fila('Tensión del pack (0x350)', m(decimal(w.vPack, 1) + ' V')) : '') +
-        (w.vCarga !== null ? fila('Tensión máxima de carga (0x360)', m(decimal(w.vCarga, 1) + ' V')) : '') +
-        (w.vDescarga !== null ? fila('Tensión mínima de descarga (0x370)', m(decimal(w.vDescarga, 1) + ' V')) : '');
+        (w.vPack !== null ? fila('Tensión del pack', m(decimal(w.vPack, 1) + ' V')) : '') +
+        (w.vCarga !== null ? fila('Tensión máxima de carga', m(decimal(w.vCarga, 1) + ' V')) : '') +
+        (w.vDescarga !== null ? fila('Tensión mínima de descarga', m(decimal(w.vDescarga, 1) + ' V')) : '');
     }
     if (x.d && x.d.sondas && !w) filasBms += x.d.sondas.map((v, i) => fila('Sensor de temperatura ' + (i + 1), decimal(v, 1) + ' ºC' + (x.d.ficticia ? ' ' + suave('simulado') : ''))).join('') +
       (x.d.balanceo ? fila('Balanceando', x.d.balanceo.length ? 'Celdas ' + x.d.balanceo.join(', ') : 'Ninguna') : '');
