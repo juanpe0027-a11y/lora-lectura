@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#070f1c">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; connect-src https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app; base-uri 'none'; form-action 'none'">
 <title>Mis baterías</title>
 <style>
   :root { color-scheme:dark; --fondo:#070f1c; --panel:#121e2e; --panel2:#1b2a3c; --panel3:#24364b; --linea:#2c3e53; --texto:#eaf0f6; --suave:#a3b3c5; --verde:#3ddc84; --verde-f:rgba(61,220,132,.14); --naranja:#ffa62b; --naranja-f:rgba(255,166,43,.15); --rojo:#ff6468; --rojo-f:rgba(255,100,104,.16); --turquesa:#2fd6d6; --turquesa-f:rgba(47,214,214,.13); --serie:#3d97e6; --rejilla:rgba(255,255,255,.09); --sobre:#07131f; }
@@ -141,7 +141,7 @@
 </div>
 
 <script>
-  // Página para el cliente: solo carga, ciclos y avisos sencillos. Datos de demostración.
+  // Página para el cliente: solo carga, ciclos y avisos sencillos. Canet son las 4 baterías reales; el resto, demostración.
   // Ojo: la contraseña se comprueba en el navegador; vale para enseñar, no como protección de verdad.
   const $ = id => document.getElementById(id);
   const escapar = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
@@ -155,6 +155,8 @@
     zaragoza: { id: 'F', nombre: 'Plataforma logística Zaragoza', tipo: 'carretilla elevadora', tipos: 'carretillas elevadoras', n: 2, clave: CLAVE_1234 },
     paterna: { id: 'C', nombre: 'Polígono Paterna', tipo: 'batería estacionaria', tipos: 'baterías estacionarias', n: 15, clave: CLAVE_1234 },
     ribaroja: { id: 'D', nombre: 'Polígono Riba-roja', tipo: 'batería estacionaria', tipos: 'baterías estacionarias', n: 23, clave: CLAVE_1234 },
+    // Canet: datos reales. La ruta de lectura va cifrada con su contraseña (PBKDF2 + AES-GCM): sin ella no se puede leer
+    canet: { id: 'R', nombre: 'Polígono Canet', tipo: 'batería', tipos: 'baterías', real: true, sobre: {"sal": "ufxWfK2AJ/LUB3Mw7SVRnw==", "iv": "eaJBjITGHDtKlNx6", "it": 600000, "dato": "xU5DZ71Z17PUOJh56NWH0xfXXhXHBIvPMcnxJMLFAU1zhWkvd67FFYYFK3l6X6Zbie+KtEoPm6TPQVqZ6RL1HJEEj/Yn"} },
   };
   const MALAS_CARGAS = ['F-01', 'C-07', 'D-12'], REVISAR = { 'C-04': 1, 'D-17': 1, 'D-09': 1 };
   const LLENA = 99, CORTES_ROJO = 3, BAJA = 20;
@@ -162,6 +164,15 @@
   async function resumenClave(t) {
     const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
     return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  async function abrirSobre(s, clave) {
+    try {
+      const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(clave), 'PBKDF2', false, ['deriveKey']);
+      const k = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(s.sal), iterations: s.it, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+      const t = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(s.iv) }, k, b64(s.dato)));
+      return t.startsWith('ruta:') ? t.slice(5) : null;
+    } catch (e) { return null; }
   }
   const buscarPoligono = u => { const q = plano(u).replace(/^poligono/, '').replace(/^plataformalogistica/, ''); return POLIGONOS[q] ? q : null; };
 
@@ -205,17 +216,71 @@
     }
   }
 
+  // --- Datos reales (Canet): se leen de la nube cada 5 s ---
+  const NUBE = 'https://lora-juanp-default-rtdb.europe-west1.firebasedatabase.app/v/';
+  const CARGA_ON_A = 5, CARGA_OFF_A = 1, CARGA_CONFIRMA_MS = 15000, SIN_DATOS_MS = 60000;
+  let ruta = null;
+  const local = { leer(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, guardar(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } } };
+  const leerLista = k => { try { const l = JSON.parse(local.leer(k) || '[]'); return Array.isArray(l) ? l : []; } catch (e) { return []; } };
+  const num = v => typeof v === 'number' && isFinite(v) ? v : null;
+  function crearReales() {
+    return [1, 2, 3, 4].map(i => {
+      const id = 'R-0' + i;
+      return { id, nombre: 'Batería ' + i, real: true, nodo: 'b' + i, cargas: leerLista('cliente-cargas-' + id), serie: leerLista('cliente-serie-' + id), soc: null, ciclos: null, salud: null, estado: 'off', hora: 0, vigia: { quiere: null, desde: 0 } };
+    });
+  }
+  // Cargador enchufado = entran más de 5 A durante 15 s; desenchufado = baja de 1 A. Con el BMS simulado no se apunta nada
+  function vigilarCarga(b, corriente, simulado) {
+    if (simulado || corriente === null || b.estado === 'off') return;
+    const log = b.cargas, v = b.vigia, ahora = Date.now(), abierta = !!(log[0] && log[0].fin === null);
+    const quiere = abierta ? !(corriente < CARGA_OFF_A) : corriente > CARGA_ON_A;
+    if (quiere === abierta) { v.quiere = null; return; }
+    if (v.quiere !== quiere) { v.quiere = quiere; v.desde = ahora; return; }
+    if (ahora - v.desde < CARGA_CONFIRMA_MS) return;
+    apuntarCarga(log, quiere, v.desde, b.soc === null ? null : Math.round(b.soc));
+    if (log.length > 300) log.length = 300;
+    local.guardar('cliente-cargas-' + b.id, JSON.stringify(log));
+    v.quiere = null;
+  }
+  // Porcentaje de las últimas 24 h, un punto cada 5 min, guardado en este móvil
+  function apuntarSerie(b) {
+    if (b.soc === null || b.estado === 'off') return;
+    const s = b.serie, ahora = Date.now(), u = s[s.length - 1];
+    if (u && ahora - u[0] < 3e5) u[1] = b.soc; else s.push([ahora, b.soc]);
+    while (s.length && s[0][0] < ahora - 864e5) s.shift();
+    local.guardar('cliente-serie-' + b.id, JSON.stringify(s));
+  }
+  async function leerNube() {
+    if (!pol || !pol.real || !ruta) return;
+    let red;
+    try { const r = await fetch(NUBE + encodeURIComponent(ruta) + '/estado/red.json', { cache: 'no-store' }); if (!r.ok) return; red = (await r.json()) || {}; } catch (e) { return; }
+    baterias.forEach(b => {
+      const d = red[b.nodo];
+      if (!d || typeof d !== 'object') { b.estado = 'off'; return; }
+      b.hora = num(d.hora) || 0;
+      const vivo = Date.now() - b.hora < SIN_DATOS_MS, bms = d.bms || {}, i = num(d.corriente);
+      b.soc = num(d.soc); b.ciclos = num(bms.ciclos_eq); b.salud = num(d.soh);
+      b.estado = !vivo ? 'off' : i !== null && i > CARGA_ON_A ? 'carga' : i !== null && Math.abs(i) > CARGA_OFF_A ? 'uso' : 'reposo';
+      vigilarCarga(b, i, d.simulado === true);
+      apuntarSerie(b);
+    });
+    pintar();
+  }
+
   // --- Lo que ve el cliente ---
   const cortesSeguidos = log => { let n = 0; for (const c of log) { if (c.fin === null) continue; if (c.socFin >= LLENA) break; n++; } return n; };
   function avisosDe(b) {
     const a = [], cortes = cortesSeguidos(b.cargas);
     if (REVISAR[b.id]) a.push({ nivel: 2, titulo: 'Necesita revisión', texto: 'Hemos detectado un problema en esta batería. Nuestro servicio técnico se pondrá en contacto contigo.' });
     if (cortes >= CORTES_ROJO) a.push({ nivel: 2, titulo: 'Se desenchufa antes de cargar del todo', texto: 'La han desenchufado ' + cortes + ' veces seguidas sin llegar al 100 %. Déjala cargar hasta el final.' });
-    if (b.soc < BAJA && b.estado !== 'carga') a.push({ nivel: 1, titulo: 'Carga baja', texto: 'Le queda un ' + Math.round(b.soc) + ' %. Conviene ponerla a cargar.' });
+    if (b.estado === 'off') a.push({ nivel: 1, titulo: 'Sin conexión', texto: b.hora ? 'No recibimos datos desde el ' + fechaCorta(b.hora) + '.' : 'Todavía no hemos recibido datos.' });
+    else if (b.soc !== null && b.soc < BAJA && b.estado !== 'carga') a.push({ nivel: 1, titulo: 'Carga baja', texto: 'Le queda un ' + Math.round(b.soc) + ' %. Conviene ponerla a cargar.' });
     return a;
   }
-  const ESTADOS = { carga: ['si', 'CARGANDO'], uso: ['gris', 'EN USO'], reposo: ['gris', 'EN REPOSO'] };
-  const pastillaEstado = b => { const a = avisosDe(b), n = Math.max(0, ...a.map(x => x.nivel)); return n === 2 ? '<span class="pastilla no">REVISAR</span>' : n === 1 ? '<span class="pastilla ojo">AVISO</span>' : '<span class="pastilla ' + ESTADOS[b.estado][0] + '">' + ESTADOS[b.estado][1] + '</span>'; };
+  const ESTADOS = { carga: ['si', 'CARGANDO'], uso: ['gris', 'EN USO'], reposo: ['gris', 'EN REPOSO'], off: ['gris', 'SIN CONEXIÓN'] };
+  const pct = v => v === null || v === undefined ? '—' : Math.round(v);
+  const entero = v => v === null || v === undefined ? '—' : Math.floor(v);
+  const pastillaEstado = b => { const a = avisosDe(b), n = Math.max(0, ...a.map(x => x.nivel)); return n === 2 ? '<span class="pastilla no">REVISAR</span>' : b.estado === 'off' ? '<span class="pastilla gris">SIN CONEXIÓN</span>' : n === 1 ? '<span class="pastilla ojo">AVISO</span>' : '<span class="pastilla ' + ESTADOS[b.estado][0] + '">' + ESTADOS[b.estado][1] + '</span>'; };
   const claseBarra = s => s < BAJA ? 'baja' : s < 50 ? 'media' : '';
   const hora = t => new Date(t).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   const fechaCorta = t => new Date(t).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -227,15 +292,16 @@
   function pintarResumen() {
     $('r-titulo').textContent = pol.nombre;
     $('r-sub').textContent = baterias.length + ' · ' + (baterias.length === 1 ? pol.tipo : pol.tipos);
-    const media = baterias.reduce((a, b) => a + b.soc, 0) / baterias.length, cargando = baterias.filter(b => b.estado === 'carga').length;
+    const conSoc = baterias.filter(b => b.soc !== null && b.estado !== 'off'), conCiclos = baterias.filter(b => b.ciclos !== null);
+    const media = conSoc.length ? conSoc.reduce((a, b) => a + b.soc, 0) / conSoc.length : null, cargando = baterias.filter(b => b.estado === 'carga').length;
     const todos = []; baterias.forEach(b => avisosDe(b).forEach(a => todos.push({ a, b })));
     todos.sort((x, y) => y.a.nivel - x.a.nivel);
-    $('r-kpis').innerHTML = kpi('Carga media', Math.round(media) + ' %', 'De todas las baterías', media < 30 ? 't-naranja' : 't-verde') + kpi('Cargando ahora', cargando, 'Enchufadas al cargador', 't-turq') + kpi('Ciclos de media', Math.round(baterias.reduce((a, b) => a + b.ciclos, 0) / baterias.length), 'Cargas completas equivalentes', '') + kpi('Avisos', todos.length, todos.length ? 'Pulsa un aviso para ver la batería' : 'Todo correcto', todos.length ? 't-rojo' : 't-verde');
+    $('r-kpis').innerHTML = kpi('Carga media', media === null ? '—' : Math.round(media) + ' %', 'De todas las baterías', media !== null && media < 30 ? 't-naranja' : 't-verde') + kpi('Cargando ahora', cargando, 'Enchufadas al cargador', 't-turq') + kpi('Ciclos de media', conCiclos.length ? Math.round(conCiclos.reduce((a, b) => a + b.ciclos, 0) / conCiclos.length) : '—', 'Cargas completas equivalentes', '') + kpi('Avisos', todos.length, todos.length ? 'Pulsa un aviso para ver la batería' : 'Todo correcto', todos.length ? 't-rojo' : 't-verde');
     $('r-avisos').innerHTML = todos.map(x => avisoHtml(x.a, x.b)).join('');
     const orden = baterias.slice().sort((x, y) => Math.max(0, ...avisosDe(y).map(a => a.nivel)) - Math.max(0, ...avisosDe(x).map(a => a.nivel)) || x.id.localeCompare(y.id));
     $('r-tarjetas').innerHTML = orden.map(b => {
-      const a = avisosDe(b), n = Math.max(0, ...a.map(x => x.nivel)), s = Math.round(b.soc);
-      return '<button class="tarjeta' + (n === 2 ? ' mal' : n === 1 ? ' ojo-b' : '') + '" type="button" data-bat="' + b.id + '"><div class="t-arriba"><strong>' + escapar(b.id) + '</strong>' + pastillaEstado(b) + '</div><div class="porcentaje">' + s + '<small> %</small></div><div class="barra ' + claseBarra(s) + '"><i style="width:' + s + '%"></i></div><div class="t-abajo"><span>Ciclos <b>' + Math.floor(b.ciclos) + '</b></span><span>' + (b.estado === 'carga' ? 'Cargando' : 'Última carga ' + fechaCorta((b.cargas[0] || {}).ini || Date.now())) + '</span></div>' + (a.length ? '<div class="t-motivo ' + (n === 2 ? 'c-rojo' : 'c-naranja') + '">' + escapar(a[0].titulo) + '</div>' : '') + '</button>';
+      const a = avisosDe(b), n = Math.max(0, ...a.map(x => x.nivel)), s = b.soc === null ? 0 : Math.round(b.soc);
+      return '<button class="tarjeta' + (n === 2 ? ' mal' : n === 1 ? ' ojo-b' : '') + '" type="button" data-bat="' + b.id + '"><div class="t-arriba"><strong>' + escapar(b.id) + (b.nombre ? ' <span class="c-suave" style="font-weight:600">· ' + escapar(b.nombre) + '</span>' : '') + '</strong>' + pastillaEstado(b) + '</div><div class="porcentaje">' + pct(b.soc) + '<small> %</small></div><div class="barra ' + claseBarra(s) + '"><i style="width:' + s + '%"></i></div><div class="t-abajo"><span>Ciclos <b>' + entero(b.ciclos) + '</b></span><span>' + (b.estado === 'carga' ? 'Cargando' : b.cargas[0] ? 'Última carga ' + fechaCorta(b.cargas[0].ini) : 'Sin cargas apuntadas') + '</span></div>' + (a.length ? '<div class="t-motivo ' + (n === 2 ? 'c-rojo' : 'c-naranja') + '">' + escapar(a[0].titulo) + '</div>' : '') + '</button>';
     }).join('');
   }
   // Porcentaje cada 10 min a partir del registro de carga: sube mientras carga y baja poco a poco entre cargas
@@ -256,11 +322,13 @@
     return pts;
   }
   function pintarGrafica(b) {
-    const caja = $('f-grafica'), svg = caja.querySelector('svg'), w = svg.clientWidth || 600, h = 200, iz = 34, ab = 22, pts = serieSoc(b);
-    const x = t => iz + (t - pts[0][0]) / (pts[pts.length - 1][0] - pts[0][0]) * (w - iz - 6), y = v => 6 + (100 - v) / 100 * (h - 6 - ab);
+    const caja = $('f-grafica'), svg = caja.querySelector('svg'), w = svg.clientWidth || 600, h = 200, iz = 34, ab = 22, t1 = Date.now(), t0 = t1 - 864e5;
+    const pts = b.real ? b.serie.filter(p => p[0] >= t0) : serieSoc(b);
+    if (!pts.length) pts.push([t1, b.soc === null ? 0 : b.soc]);
+    const x = t => iz + (t - t0) / (t1 - t0) * (w - iz - 6), y = v => 6 + (100 - v) / 100 * (h - 6 - ab);
     let s = '';
     [0, 50, 100].forEach(v => { s += '<line x1="' + iz + '" x2="' + w + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--rejilla)"/><text x="' + (iz - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11" fill="var(--suave)">' + v + ' %</text>'; });
-    [0, 6, 12, 18, 24].forEach(k => { const t = pts[0][0] + k * 36e5; s += '<text x="' + x(t) + '" y="' + (h - 4) + '" text-anchor="' + (k === 0 ? 'start' : k === 24 ? 'end' : 'middle') + '" font-size="11" fill="var(--suave)">' + (k === 24 ? 'Ahora' : hora(t)) + '</text>'; });
+    [0, 6, 12, 18, 24].forEach(k => { const t = t0 + k * 36e5; s += '<text x="' + x(t) + '" y="' + (h - 4) + '" text-anchor="' + (k === 0 ? 'start' : k === 24 ? 'end' : 'middle') + '" font-size="11" fill="var(--suave)">' + (k === 24 ? 'Ahora' : hora(t)) + '</text>'; });
     const linea = pts.map(p => x(p[0]).toFixed(1) + ',' + y(p[1]).toFixed(1)).join(' ');
     s += '<polygon points="' + x(pts[0][0]) + ',' + y(0) + ' ' + linea + ' ' + x(pts[pts.length - 1][0]) + ',' + y(0) + '" fill="var(--serie)" opacity=".12"/><polyline points="' + linea + '" fill="none" stroke="var(--serie)" stroke-width="2" stroke-linejoin="round"/>';
     s += '<line id="g-cruz" y1="6" y2="' + (h - ab) + '" stroke="var(--suave)" stroke-dasharray="3 3" hidden/><circle id="g-punto" r="4.5" fill="var(--serie)" stroke="var(--panel)" stroke-width="2" hidden/>';
@@ -281,20 +349,20 @@
   function pintarFicha() {
     const b = baterias.find(x => x.id === abierta);
     if (!b) return;
-    const a = avisosDe(b), s = Math.round(b.soc), cortes = cortesSeguidos(b.cargas), rojo = cortes >= CORTES_ROJO;
-    $('f-titulo').textContent = b.id;
+    const a = avisosDe(b), s = b.soc === null ? 0 : Math.round(b.soc), cortes = cortesSeguidos(b.cargas), rojo = cortes >= CORTES_ROJO;
+    $('f-titulo').textContent = b.id + (b.nombre ? ' · ' + b.nombre : '');
     $('f-estado').innerHTML = pastillaEstado(b);
     $('f-avisos').innerHTML = a.map(x => avisoHtml(x, null)).join('');
     const dia = Date.now() - 864e5, hoy = b.cargas.filter(c => c.ini >= dia);
     $('f-datos').innerHTML =
-      '<div class="dato"><small>Carga</small><b class="' + (s < BAJA ? 'c-rojo' : '') + '">' + s + ' %</b><div class="barra ' + claseBarra(s) + '" style="margin-top:8px"><i style="width:' + s + '%"></i></div></div>' +
-      '<div class="dato"><small>Ciclos de carga</small><b>' + Math.floor(b.ciclos) + '</b><span>Cargas completas equivalentes</span></div>' +
-      '<div class="dato"><small>Salud de la batería</small><b>' + Math.round(b.salud) + ' %</b><span>Capacidad que le queda</span></div>' +
+      '<div class="dato"><small>Carga</small><b class="' + (b.soc !== null && s < BAJA ? 'c-rojo' : '') + '">' + pct(b.soc) + ' %</b><div class="barra ' + claseBarra(s) + '" style="margin-top:8px"><i style="width:' + s + '%"></i></div></div>' +
+      '<div class="dato"><small>Ciclos de carga</small><b>' + entero(b.ciclos) + '</b><span>Cargas completas equivalentes</span></div>' +
+      '<div class="dato"><small>Salud de la batería</small><b>' + pct(b.salud) + ' %</b><span>Capacidad que le queda</span></div>' +
       '<div class="dato"><small>Cargas hoy</small><b class="' + (rojo ? 'c-rojo' : '') + '">' + hoy.length + '</b><span>' + (cortes ? cortes + ' seguidas sin llegar al 100 %' : 'Todas completas') + '</span></div>';
     let racha = rojo ? cortes : 0;
-    $('f-cargas').innerHTML = '<table><thead><tr><th>Enchufada</th><th>Desenchufada</th><th>Tiempo</th><th>Carga</th><th></th></tr></thead><tbody>' + b.cargas.slice(0, 60).map(c => {
+    $('f-cargas').innerHTML = !b.cargas.length ? '<p class="c-suave" style="margin:0">Todavía no hay cargas apuntadas.</p>' : '<table><thead><tr><th>Enchufada</th><th>Desenchufada</th><th>Tiempo</th><th>Carga</th><th></th></tr></thead><tbody>' + b.cargas.slice(0, 60).map(c => {
       const roja = c.fin !== null && racha-- > 0, llena = c.fin !== null && c.socFin >= LLENA;
-      return '<tr' + (roja ? ' class="roja"' : '') + '><td>' + fechaCorta(c.ini) + '</td><td>' + (c.fin === null ? '<span class="c-verde">Cargando</span>' : fechaCorta(c.fin)) + '</td><td>' + duracion((c.fin || Date.now()) - c.ini) + '</td><td>' + c.socIni + ' % → ' + (c.fin === null ? s : c.socFin) + ' %</td><td>' + (c.fin === null ? '' : llena ? '<span class="c-verde">Completa</span>' : '<b class="' + (roja ? 'c-rojo' : 'c-naranja') + '">Sin terminar</b>') + '</td></tr>';
+      return '<tr' + (roja ? ' class="roja"' : '') + '><td>' + fechaCorta(c.ini) + '</td><td>' + (c.fin === null ? '<span class="c-verde">Cargando</span>' : fechaCorta(c.fin)) + '</td><td>' + duracion((c.fin || Date.now()) - c.ini) + '</td><td>' + pct(c.socIni) + ' % → ' + pct(c.fin === null ? b.soc : c.socFin) + ' %</td><td>' + (c.fin === null ? '' : llena ? '<span class="c-verde">Completa</span>' : '<b class="' + (roja ? 'c-rojo' : 'c-naranja') + '">Sin terminar</b>') + '</td></tr>';
     }).join('') + '</tbody></table>';
     // La gráfica se redibuja cada minuto (o al girar el móvil) para no quitar la burbuja mientras se mira
     if (Date.now() - graficaHora > 6e4 || graficaDe !== b.id) { graficaHora = Date.now(); graficaDe = b.id; pintarGrafica(b); }
@@ -305,25 +373,34 @@
 
   function entrar(clave) {
     pol = POLIGONOS[clave];
-    baterias = crearBaterias(pol);
+    baterias = pol.real ? crearReales() : crearBaterias(pol);
     $('v-entrada').hidden = true; $('v-app').hidden = false;
     abrir(null);
+    if (pol.real) leerNube();
   }
   $('f-entrar').addEventListener('submit', async ev => {
     ev.preventDefault();
-    const k = buscarPoligono($('usuario').value), r = await resumenClave($('clave').value);
-    if (!k || POLIGONOS[k].clave !== r) { $('error').textContent = 'Usuario o contraseña incorrectos.'; $('clave').value = ''; return; }
+    const k = buscarPoligono($('usuario').value), p = k && POLIGONOS[k];
+    if (p && p.real) {
+      $('error').textContent = 'Comprobando…';
+      ruta = await abrirSobre(p.sobre, $('clave').value);
+      if (ruta) memoria.guardar('cliente-ruta', ruta);
+    }
+    const r = await resumenClave($('clave').value);
+    if (!p || (p.real ? !ruta : p.clave !== r)) { $('error').textContent = 'Usuario o contraseña incorrectos.'; $('clave').value = ''; return; }
     $('error').textContent = ''; $('clave').value = '';
     memoria.guardar('cliente', k);
     entrar(k);
   });
-  $('salir').onclick = () => { memoria.guardar('cliente', null); pol = null; abierta = null; $('v-app').hidden = true; $('v-entrada').hidden = false; $('usuario').value = ''; };
+  $('salir').onclick = () => { memoria.guardar('cliente', null); memoria.guardar('cliente-ruta', null); ruta = null; pol = null; abierta = null; $('v-app').hidden = true; $('v-entrada').hidden = false; $('usuario').value = ''; };
   $('volver').onclick = () => abrir(null);
   document.addEventListener('click', ev => { const el = ev.target.closest('[data-bat]'); if (el && pol && !abierta) abrir(el.dataset.bat); });
   window.addEventListener('resize', () => { graficaHora = 0; if (abierta) pintar(); });
-  setInterval(() => { if (!pol) return; baterias.forEach(avanzar); pintar(); }, 2000);
+  setInterval(() => { if (!pol || pol.real) return; baterias.forEach(avanzar); pintar(); }, 2000);
+  setInterval(leerNube, 5000);
   const guardada = memoria.leer('cliente');
-  if (guardada && POLIGONOS[guardada]) entrar(guardada);
+  ruta = memoria.leer('cliente-ruta');
+  if (guardada && POLIGONOS[guardada] && (!POLIGONOS[guardada].real || ruta)) entrar(guardada);
 </script>
 </body>
 </html>
