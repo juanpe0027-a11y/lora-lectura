@@ -1397,7 +1397,7 @@
       const papel = esPasarela ? 'Pasarela: recibe a las demás y sube por Wi-Fi' : 'Nodo';
       poner('fi-ajustes', fila('Papel', papel) + fila('Wi-Fi de la pasarela', textoWifi(x.d)) +
         fila('Pila 18650 de la placa', textoPila(x.d)) +
-        fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB · ' + numero(x.d.calidad) + ' % de mensajes recibidos' : suave('Sin datos')) +
+        fila('Enlace LoRa', esPasarela ? suave('Es la que recibe') : x.d && x.d.rssi_lora ? x.d.rssi_lora + ' dB' : suave('Sin datos')) +
         fila('GPS', textoGps(x.d) + (x.d && x.d.gps && x.d.hdop ? suave(' · HDOP ' + decimal(x.d.hdop, 1)) : '')) +
         fila('Posición', x.lat !== null ? coordenadas(x) + (x.d.alt !== undefined ? suave(' · ' + Math.round(x.d.alt) + ' m') : '') : suave('Sin posición')) +
         '');
@@ -1917,8 +1917,8 @@
       if (vista !== 'mapa') return;
       if (!mapa) {
         mapa = crearMapa(L, 'mapa');
-        // Las zonas de Canet y Sagunto son aproximadas: la batería real sale donde diga su GPS
-        zonasMapa = FLOTA.map(c => L.polygon(contorno(c.zona), { color: '#2fd6d6', weight: 2, fillOpacity: 0.12 }).bindTooltip(c.zona.nombre + ' · zona aproximada', { direction: 'top' }).addTo(mapa));
+        // Las zonas solo sirven para encuadrar el mapa: no se dibujan (cada batería sale donde diga su GPS)
+        zonasMapa = FLOTA.map(c => L.polygon(contorno(c.zona)));
         capaPuntos = L.layerGroup(); capaResumen = L.layerGroup(); capaReales = L.layerGroup().addTo(mapa);
         anchoMapa = $('mapa').clientWidth;
         mapa.fitBounds(L.featureGroup(zonasMapa).getBounds());
