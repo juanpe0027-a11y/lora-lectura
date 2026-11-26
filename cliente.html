@@ -93,7 +93,7 @@
   .pista { margin:10px 0 0; color:var(--suave); font-size:13px; }
   @media (min-width:760px) {
     .kpis { grid-template-columns:repeat(4,minmax(0,1fr)); }
-    .grande { grid-template-columns:repeat(4,minmax(0,1fr)); }
+    .grande { grid-template-columns:repeat(3,minmax(0,1fr)); }
     .dos { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   }
 </style>
@@ -195,7 +195,7 @@
       const id = p.id + '-' + String(i + 1).padStart(2, '0'), cargas = cargasDemo(id), u = cargas[0];
       // Desde la última carga ha ido bajando poco a poco
       const soc = Math.max(8, Math.min(98, u.socFin - (Date.now() - u.fin) / 36e5 * azar(1, 6)));
-      return { id, cargas, soc, ciclos: azar(150, 950), salud: azar(86, 99), estado: 'uso', hasta: Date.now() + azar(30, 120) * 1000 };
+      return { id, cargas, soc, ciclos: azar(150, 950), salud: azar(86, 99), temp: azar(21, 27), tension: null, estado: 'uso', hasta: Date.now() + azar(30, 120) * 1000 };
     });
   }
   function apuntarCarga(log, enchufado, t, soc) {
@@ -208,6 +208,7 @@
     const ahora = Date.now();
     if (b.estado === 'carga') { b.soc = Math.min(100, b.soc + 0.25); b.ciclos += 0.0025; }
     else if (b.estado === 'uso') b.soc = Math.max(5, b.soc - azar(0.03, 0.12));
+    b.temp += ((b.estado === 'carga' ? 32 : b.estado === 'uso' ? 28 : 23) - b.temp) * 0.02 + azar(-0.1, 0.1);
     if (ahora > b.hasta || (b.estado === 'carga' && b.soc >= 100)) {
       const antes = b.estado;
       b.estado = antes === 'carga' ? (Math.random() < 0.5 ? 'uso' : 'reposo') : b.soc < 45 || Math.random() < 0.3 ? 'carga' : antes === 'uso' ? 'reposo' : 'uso';
@@ -226,7 +227,7 @@
   function crearReales() {
     return [1, 2, 3, 4].map(i => {
       const id = 'R-0' + i;
-      return { id, nombre: 'Batería ' + i, real: true, nodo: 'b' + i, cargas: leerLista('cliente-cargas-' + id), serie: leerLista('cliente-serie-' + id), soc: null, ciclos: null, salud: null, estado: 'off', hora: 0, vigia: { quiere: null, desde: 0 } };
+      return { id, nombre: 'Batería ' + i, real: true, nodo: 'b' + i, cargas: leerLista('cliente-cargas-' + id), serie: leerLista('cliente-serie-' + id), soc: null, ciclos: null, salud: null, tension: null, temp: null, estado: 'off', hora: 0, vigia: { quiere: null, desde: 0 } };
     });
   }
   // Cargador enchufado = entran más de 5 A durante 15 s; desenchufado = baja de 1 A. Con el BMS simulado no se apunta nada
@@ -259,7 +260,9 @@
       if (!d || typeof d !== 'object') { b.estado = 'off'; return; }
       b.hora = num(d.hora) || 0;
       const vivo = Date.now() - b.hora < SIN_DATOS_MS, bms = d.bms || {}, i = num(d.corriente);
-      b.soc = num(d.soc); b.ciclos = num(bms.ciclos_eq); b.salud = num(d.soh);
+      b.soc = num(d.soc); b.ciclos = num(bms.ciclos_eq); b.salud = num(d.soh); b.temp = num(d.temp);
+      b.tension = num(d.tension);
+      if (b.tension === null && Array.isArray(d.celdas) && d.celdas.length) { const t = d.celdas.reduce((a, v) => a + (+v || 0), 0); b.tension = t > 1000 ? t / 1000 : t; }
       b.estado = !vivo ? 'off' : i !== null && i > CARGA_ON_A ? 'carga' : i !== null && Math.abs(i) > CARGA_OFF_A ? 'uso' : 'reposo';
       vigilarCarga(b, i, d.simulado === true);
       apuntarSerie(b);
@@ -279,6 +282,9 @@
   }
   const ESTADOS = { carga: ['si', 'CARGANDO'], uso: ['gris', 'EN USO'], reposo: ['gris', 'EN REPOSO'], off: ['gris', 'SIN CONEXIÓN'] };
   const pct = v => v === null || v === undefined ? '—' : Math.round(v);
+  // Voltaje de la batería completa (las de demostración, LiFePO4 de 24 V según la carga) y temperatura
+  const voltios = b => b.real ? b.tension : b.soc === null ? null : 24 + b.soc * 0.036;
+  const coma = (v, d) => v === null || v === undefined ? '—' : v.toFixed(d).replace('.', ',');
   const entero = v => v === null || v === undefined ? '—' : Math.floor(v);
   const pastillaEstado = b => { const a = avisosDe(b), n = Math.max(0, ...a.map(x => x.nivel)); return n === 2 ? '<span class="pastilla no">REVISAR</span>' : b.estado === 'off' ? '<span class="pastilla gris">SIN CONEXIÓN</span>' : n === 1 ? '<span class="pastilla ojo">AVISO</span>' : '<span class="pastilla ' + ESTADOS[b.estado][0] + '">' + ESTADOS[b.estado][1] + '</span>'; };
   const claseBarra = s => s < BAJA ? 'baja' : s < 50 ? 'media' : '';
@@ -301,7 +307,7 @@
     const orden = baterias.slice().sort((x, y) => Math.max(0, ...avisosDe(y).map(a => a.nivel)) - Math.max(0, ...avisosDe(x).map(a => a.nivel)) || x.id.localeCompare(y.id));
     $('r-tarjetas').innerHTML = orden.map(b => {
       const a = avisosDe(b), n = Math.max(0, ...a.map(x => x.nivel)), s = b.soc === null ? 0 : Math.round(b.soc);
-      return '<button class="tarjeta' + (n === 2 ? ' mal' : n === 1 ? ' ojo-b' : '') + '" type="button" data-bat="' + b.id + '"><div class="t-arriba"><strong>' + escapar(b.id) + (b.nombre ? ' <span class="c-suave" style="font-weight:600">· ' + escapar(b.nombre) + '</span>' : '') + '</strong>' + pastillaEstado(b) + '</div><div class="porcentaje">' + pct(b.soc) + '<small> %</small></div><div class="barra ' + claseBarra(s) + '"><i style="width:' + s + '%"></i></div><div class="t-abajo"><span>Ciclos <b>' + entero(b.ciclos) + '</b></span><span>' + (b.estado === 'carga' ? 'Cargando' : b.cargas[0] ? 'Última carga ' + fechaCorta(b.cargas[0].ini) : 'Sin cargas apuntadas') + '</span></div>' + (a.length ? '<div class="t-motivo ' + (n === 2 ? 'c-rojo' : 'c-naranja') + '">' + escapar(a[0].titulo) + '</div>' : '') + '</button>';
+      return '<button class="tarjeta' + (n === 2 ? ' mal' : n === 1 ? ' ojo-b' : '') + '" type="button" data-bat="' + b.id + '"><div class="t-arriba"><strong>' + escapar(b.id) + (b.nombre ? ' <span class="c-suave" style="font-weight:600">· ' + escapar(b.nombre) + '</span>' : '') + '</strong>' + pastillaEstado(b) + '</div><div class="porcentaje">' + pct(b.soc) + '<small> %</small></div><div class="barra ' + claseBarra(s) + '"><i style="width:' + s + '%"></i></div><div class="t-abajo"><span>Voltaje <b>' + coma(voltios(b), 1) + ' V</b></span><span>Temperatura <b>' + coma(b.temp, 0) + ' ºC</b></span></div><div class="t-abajo"><span>Ciclos <b>' + entero(b.ciclos) + '</b></span><span>' + (b.estado === 'carga' ? 'Cargando' : b.cargas[0] ? 'Última carga ' + fechaCorta(b.cargas[0].ini) : 'Sin cargas apuntadas') + '</span></div>' + (a.length ? '<div class="t-motivo ' + (n === 2 ? 'c-rojo' : 'c-naranja') + '">' + escapar(a[0].titulo) + '</div>' : '') + '</button>';
     }).join('');
   }
   // Porcentaje cada 10 min a partir del registro de carga: sube mientras carga y baja poco a poco entre cargas
@@ -357,6 +363,8 @@
     $('f-datos').innerHTML =
       '<div class="dato"><small>Carga</small><b class="' + (b.soc !== null && s < BAJA ? 'c-rojo' : '') + '">' + pct(b.soc) + ' %</b><div class="barra ' + claseBarra(s) + '" style="margin-top:8px"><i style="width:' + s + '%"></i></div></div>' +
       '<div class="dato"><small>Ciclos de carga</small><b>' + entero(b.ciclos) + '</b><span>Cargas completas equivalentes</span></div>' +
+      '<div class="dato"><small>Voltaje</small><b>' + coma(voltios(b), 1) + ' V</b><span>De la batería completa</span></div>' +
+      '<div class="dato"><small>Temperatura</small><b>' + coma(b.temp, 0) + ' ºC</b><span>De la batería</span></div>' +
       '<div class="dato"><small>Salud de la batería</small><b>' + pct(b.salud) + ' %</b><span>Capacidad que le queda</span></div>' +
       '<div class="dato"><small>Cargas hoy</small><b class="' + (rojo ? 'c-rojo' : '') + '">' + hoy.length + '</b><span>' + (cortes ? cortes + ' seguidas sin llegar al 100 %' : 'Todas completas') + '</span></div>';
     let racha = rojo ? cortes : 0;
