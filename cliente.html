@@ -261,8 +261,9 @@
       b.hora = num(d.hora) || 0;
       const vivo = Date.now() - b.hora < SIN_DATOS_MS, bms = d.bms || {}, i = num(d.corriente);
       b.soc = num(d.soc); b.ciclos = num(bms.ciclos_eq); b.salud = num(d.soh); b.temp = num(d.temp);
-      b.tension = num(d.tension);
-      if (b.tension === null && Array.isArray(d.celdas) && d.celdas.length) { const t = d.celdas.reduce((a, v) => a + (+v || 0), 0); b.tension = t > 1000 ? t / 1000 : t; }
+      // Voltaje = suma de todas las celdas de la batería; si no llegan las celdas, el que manda el BMS
+      if (Array.isArray(d.celdas) && d.celdas.length) { const t = d.celdas.reduce((a, v) => a + (+v || 0), 0); b.tension = t > 1000 ? t / 1000 : t; }
+      else b.tension = num(d.tension);
       b.estado = !vivo ? 'off' : i !== null && i > CARGA_ON_A ? 'carga' : i !== null && Math.abs(i) > CARGA_OFF_A ? 'uso' : 'reposo';
       vigilarCarga(b, i, d.simulado === true);
       apuntarSerie(b);
